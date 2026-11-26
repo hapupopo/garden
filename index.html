@@ -708,7 +708,7 @@ function vMap(){
       h += `<button class="zone" data-act="zone" data-z="${z}"><div class="zl"><span>${trellis().includes(z)?'🪜':''}${zi+1}구역 ${peak?`<b style="color:${peak>100?'var(--warn)':'var(--green)'}">${peak}%</b>`:''}</span>${zoneWarn(z,year)?'<span class="warn">⚠ 연작</span>':''}</div>`;
       const yy = s => s.slice(0,4)!=year ? s.slice(2,4)+'.' : '';
       h += ps.map(p => { const e = endOf(p), cls = e < t ? 'past' : (p.date <= t ? 'now' : ''), pc = Math.round(useOf(p,z)/zoneCap()*100);
-        return `<span class="chip ${cls}" data-pid="${p.id}" data-z="${z}" style="background:linear-gradient(90deg,var(--green2) ${pc}%,var(--bg) ${pc}%)">${plantName(p)} <b style="font-size:11px">${qtyOf(p)}포기</b>
+        return `<span class="chip ${cls}" data-pid="${p.id}" data-z="${z}" style="background:linear-gradient(90deg,var(--green2) ${pc}%,var(--bg) ${pc}%)">${plantName(p)}
           <small>${yy(p.date)}${md(p.date)}~${yy(e)}${md(e)} · ${pc}%</small></span>`; }).join('');
       h += `</button>`;
     }
@@ -1027,7 +1027,7 @@ function drawPlan(){
       const peak = Math.round(100 - freeOver(z, yS, yE, all) / cap * 100);
       return `<div style="padding:5px 0;border-bottom:1px solid var(--line);font-size:14px"><b>${plan.fixed.includes(z)?'📌':''}${TR.includes(z)?'🪜':''}${zi+1}구역</b>
         <small style="color:var(--sub)"> 최대 ${peak}%</small><br>${ps.length ? ps.map(p =>
-        `<span style="${isNew(p)?'':'color:var(--sub)'}">${plantName(p)} ${Math.round(useOf(p,z)/areaOf(p.crop))}포기</span> <small style="color:var(--sub)">${md(p.date)}~${md(endOf(p))} · ${Math.round(useOf(p,z)/cap*100)}%${!isNew(p)?' 기존':p.memo==='자동 채움'?' 채움':''}</small>${p.warn?' <span class="late">⚠</span>':''}`).join('<br>') : '<small class="late">비어 있음</small>'}</div>`; }).join('')).join('')}</div>
+        `<span style="${isNew(p)?'':'color:var(--sub)'}">${plantName(p)}</span> <small style="color:var(--sub)">${md(p.date)}~${md(endOf(p))} · ${Math.round(useOf(p,z)/cap*100)}%${!isNew(p)?' 기존':p.memo==='자동 채움'?' 채움':''}</small>${p.warn?' <span class="late">⚠</span>':''}`).join('<br>') : '<small class="late">비어 있음</small>'}</div>`; }).join('')).join('')}</div>
     <div class="legend" style="margin-top:0">📌 고정 구역 · 🪜 지주 구역 · % = 구역 넓이 중 차지하는 비율 · '채움' = 남는 넓이를 자동으로 채운 작물</div>
     ${(() => { const seen = new Set(), good = [], bad = [];
       plan.out.flatMap(p => p.notes||[]).forEach(n => { const key = [n.a,n.b].sort().join(); if (seen.has(key)) return; seen.add(key);
