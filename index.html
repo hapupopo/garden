@@ -714,7 +714,7 @@ function vMap(){
     }
     h += `</div>`;
   });
-  h += `</div><div class="legend">작물을 꾹 눌러 끌면 다른 구역으로 옮기고, 꾹 눌렀다 떼면 포기 수 조정·삭제. 구역 하나 ≈ ${fmtA(zoneCap())}㎡. 막대·% = 구역에서 차지하는 넓이, 구역 옆 % = 그해 가장 빠듯할 때 사용률. 넓이가 남으면 여러 작물을 한 구역에 같이 심을 수 있어요. 초록 테두리 = 지금 자라는 중.</div>`;
+  h += `</div><div class="legend">작물을 꾹 눌러 다른 구역에 놓으면 옮기고, 원래 구역에 놓으면 포기 수 조정·삭제. 구역 하나 ≈ ${fmtA(zoneCap())}㎡. 막대·% = 구역에서 차지하는 넓이, 구역 옆 % = 그해 가장 빠듯할 때 사용률. 넓이가 남으면 여러 작물을 한 구역에 같이 심을 수 있어요. 초록 테두리 = 지금 자라는 중.</div>`;
   return h;
 }
 
@@ -1245,7 +1245,7 @@ function dragMove(x, y){
   drag.ghost.style.left = x + 'px'; drag.ghost.style.top = y + 'px';
   const zone = document.elementFromPoint(x, y)?.closest('.zone');
   document.querySelectorAll('.zone.drop').forEach(e => e !== zone && e.classList.remove('drop'));
-  if (zone && zone.dataset.z !== drag.from) zone.classList.add('drop');
+  if (zone) zone.classList.add('drop');   // 원래 구역도 표시 (놓으면 편집)
   if (y < 90) scrollBy(0, -14); else if (y > innerHeight - 110) scrollBy(0, 14);   // 끝에 가면 자동 스크롤
 }
 function dragEnd(){
@@ -1256,9 +1256,9 @@ function dragEnd(){
   document.body.classList.remove('dragging'); d.ghost?.remove();
   if (!d.on) return;
   eatClick = true; setTimeout(() => eatClick = false, 400);
-  if (!d.moved) return chipSheet(d.pid, d.from);   // 꾹 눌렀다 그냥 떼면 편집
-  const to = document.elementFromPoint(d.x, d.y)?.closest('.zone')?.dataset.z;
-  if (to && to !== d.from) movePlant(d.pid, d.from, to);
+  const to = d.moved ? document.elementFromPoint(d.x, d.y)?.closest('.zone')?.dataset.z : d.from;
+  if (to === d.from) return chipSheet(d.pid, d.from);   // 꾹 눌러 원래 구역에 놓으면 편집
+  if (to) movePlant(d.pid, d.from, to);
 }
 function movePlant(pid, from, to){
   const p = S.plantings.find(x => x.id === pid); if (!p) return;
