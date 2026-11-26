@@ -1,0 +1,606 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>우리 텃밭</title>
+<meta name="theme-color" content="#3e6b3a">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="텃밭">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icon-180.png">
+<style>
+:root{
+  --bg:#f6f3ea;--card:#fffdf7;--ink:#2b2a25;--sub:#76705f;--line:#e4ddca;
+  --green:#3e6b3a;--green2:#e3eedb;--soil:#7a5434;--soil2:#efe3d3;--warn:#b5532c;--warn2:#fbe6dc;
+  --prep:#8a6d3b;--fert:#3f7d4a;--prune:#6b5bb0;--pest:#b5532c;--water:#2f74b5;--harvest:#c48a12;--care:#6f6a5a;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#191a16;--card:#23241f;--ink:#ece8dc;--sub:#a39d8c;--line:#3a3a32;
+  --green:#8cc27f;--green2:#2b3a27;--soil:#d1a476;--soil2:#3a2f24;--warn:#f08a5d;--warn2:#3d2820;
+  --prep:#d2b07a;--fert:#7cc28a;--prune:#a99be6;--pest:#f08a5d;--water:#71abe6;--harvest:#e8b54a;--care:#b3ad9b;
+}}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 -apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo","Noto Sans KR",sans-serif}
+header{position:sticky;top:0;z-index:5;background:var(--bg);padding:calc(10px + env(safe-area-inset-top)) 16px 8px;display:flex;align-items:center;gap:8px;border-bottom:1px solid var(--line)}
+header h1{font-size:18px;margin:0;flex:1}
+#sync{font-size:12px;color:var(--sub);display:flex;align-items:center;gap:5px}
+#sync i{width:8px;height:8px;border-radius:50%;background:var(--line);display:inline-block}
+#sync.ok i{background:var(--fert)}#sync.busy i{background:var(--harvest)}#sync.err i{background:var(--warn)}
+main{padding:12px 16px calc(90px + env(safe-area-inset-bottom));max-width:720px;margin:0 auto}
+nav{position:fixed;bottom:0;left:0;right:0;z-index:5;background:var(--card);border-top:1px solid var(--line);display:flex;padding-bottom:env(safe-area-inset-bottom)}
+nav button{flex:1;border:0;background:none;color:var(--sub);padding:8px 0 10px;font-size:11px;display:flex;flex-direction:column;align-items:center;gap:2px}
+nav button b{font-size:20px;line-height:1;font-weight:400}
+nav button.on{color:var(--green);font-weight:700}
+h2{font-size:15px;margin:18px 0 8px;color:var(--sub);font-weight:600}
+h2:first-child{margin-top:4px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px;margin-bottom:10px}
+.tip{background:var(--green2);border:0}
+.tip b{color:var(--green)}
+.btn{border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:10px;padding:9px 14px;font:inherit;font-weight:600}
+.btn.pri{background:var(--green);border-color:var(--green);color:#fff}
+.btn.del{color:var(--warn)}
+.btn.sm{padding:5px 10px;font-size:13px}
+.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.task{display:flex;gap:10px;align-items:flex-start;padding:10px 0;border-bottom:1px solid var(--line)}
+.task:last-child{border-bottom:0}
+.chk{flex:none;width:24px;height:24px;border-radius:7px;border:2px solid var(--line);background:none;display:grid;place-items:center;color:#fff;font-size:14px;padding:0;margin-top:1px}
+.done .chk{background:var(--green);border-color:var(--green)}
+.done .tt{text-decoration:line-through;color:var(--sub)}
+.tb{flex:1;min-width:0}
+.tt{font-weight:500}
+.tm{font-size:12px;color:var(--sub);display:flex;gap:6px;flex-wrap:wrap;margin-top:2px}
+.tag{font-size:11px;padding:1px 7px;border-radius:99px;color:#fff;font-weight:600;white-space:nowrap}
+.t-prep{background:var(--prep)}.t-fert{background:var(--fert)}.t-prune{background:var(--prune)}.t-pest{background:var(--pest)}.t-water{background:var(--water)}.t-harvest{background:var(--harvest)}.t-care{background:var(--care)}
+.late{color:var(--warn);font-weight:600}
+.empty{color:var(--sub);text-align:center;padding:24px 8px}
+.ynav{display:flex;align-items:center;justify-content:center;gap:16px;margin:2px 0 12px}
+.ynav b{font-size:20px;min-width:80px;text-align:center}
+.ynav button{border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:99px;width:36px;height:36px;font-size:18px}
+.beds{display:grid;gap:10px}
+.bed{background:var(--soil2);border-radius:12px;padding:8px;display:flex;flex-direction:column;gap:6px}
+.bed>h3{margin:0 0 2px;font-size:13px;text-align:center;color:var(--soil)}
+.zone{background:var(--card);border:1px solid var(--line);border-radius:9px;padding:7px 8px;min-height:58px;text-align:left;font:inherit;color:inherit;width:100%}
+.zone .zl{font-size:11px;color:var(--sub);display:flex;justify-content:space-between}
+.zone .warn{color:var(--warn)}
+.chip{display:block;font-size:13px;margin-top:3px;padding:2px 6px;border-radius:6px;background:var(--green2);line-height:1.35}
+.chip.past{background:var(--bg);color:var(--sub)}
+.chip.now{outline:2px solid var(--green)}
+.chip small{display:block;font-size:11px;color:var(--sub)}
+.legend{font-size:12px;color:var(--sub);margin-top:10px}
+.cal{display:grid;grid-template-columns:repeat(7,1fr);gap:3px}
+.cal .h{text-align:center;font-size:11px;color:var(--sub);padding:2px 0}
+.cal button{aspect-ratio:1/1.05;border:1px solid var(--line);background:var(--card);border-radius:8px;padding:3px;font:inherit;font-size:13px;color:var(--ink);display:flex;flex-direction:column;align-items:center;gap:3px}
+.cal button.o{opacity:.35}
+.cal button.td{border-color:var(--green);border-width:2px;font-weight:700}
+.cal button.sel{background:var(--green2)}
+.dots{display:flex;gap:2px;flex-wrap:wrap;justify-content:center}
+.dots i{width:6px;height:6px;border-radius:50%}
+details.crop{background:var(--card);border:1px solid var(--line);border-radius:12px;margin-bottom:8px}
+details.crop summary{padding:11px 12px;list-style:none;display:flex;gap:8px;align-items:center}
+details.crop summary::-webkit-details-marker{display:none}
+details.crop summary span{flex:1}
+details.crop summary small{color:var(--sub)}
+details.crop .body{padding:0 12px 12px;font-size:14px}
+.sch{display:grid;grid-template-columns:auto 1fr;gap:4px 10px;font-size:13px;margin-top:6px}
+.sch b{color:var(--sub);font-weight:500;text-align:right;white-space:nowrap}
+.note{background:var(--soil2);border-radius:8px;padding:8px 10px;font-size:13px;margin-top:6px}
+label{display:block;font-size:13px;color:var(--sub);margin:12px 0 4px}
+input,select,textarea{width:100%;font:inherit;font-size:16px;padding:9px 10px;border:1px solid var(--line);border-radius:9px;background:var(--bg);color:var(--ink)}
+input[type=checkbox]{width:auto}
+.zsel{display:flex;flex-wrap:wrap;gap:6px}
+.zsel button{border:1px solid var(--line);background:var(--bg);color:var(--ink);border-radius:8px;padding:6px 10px;font:inherit;font-size:14px}
+.zsel button.on{background:var(--green);border-color:var(--green);color:#fff}
+.zsel .bn{width:100%;font-size:12px;color:var(--sub);margin-top:4px}
+.wbox{background:var(--warn2);color:var(--warn);border-radius:9px;padding:8px 10px;font-size:13px;margin-top:10px}
+.okbox{background:var(--green2);color:var(--green);border-radius:9px;padding:8px 10px;font-size:13px;margin-top:10px}
+#bk{position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:10;display:none}
+#sheet{position:fixed;left:0;right:0;bottom:0;z-index:11;background:var(--card);border-radius:18px 18px 0 0;max-height:88vh;overflow:auto;padding:16px 16px calc(20px + env(safe-area-inset-bottom));transform:translateY(105%);transition:transform .22s;max-width:720px;margin:0 auto}
+body.sh #bk{display:block}body.sh #sheet{transform:none}
+#sheet h3{margin:0 0 4px;font-size:17px}
+.acts{display:flex;gap:8px;margin-top:18px}
+.acts .btn{flex:1}
+.hist{font-size:13px;display:grid;grid-template-columns:auto 1fr;gap:3px 10px}
+.hist b{color:var(--sub);font-weight:500}
+</style>
+</head>
+<body>
+<header><h1>🌱 우리 텃밭</h1><div id="sync"><i></i><span>로컬</span></div></header>
+<main id="main"></main>
+<nav id="nav">
+  <button data-act="view" data-v="todo"><b>✓</b>할 일</button>
+  <button data-act="view" data-v="map"><b>▦</b>배치도</button>
+  <button data-act="view" data-v="cal"><b>▤</b>달력</button>
+  <button data-act="view" data-v="crops"><b>❀</b>작물</button>
+  <button data-act="view" data-v="set"><b>⚙</b>설정</button>
+</nav>
+<div id="bk" data-act="close"></div>
+<div id="sheet"></div>
+
+<script>
+// ───────── 작물 정보 (중부지방 기준) ─────────
+// w: 기본 심는 날짜 [월,일] / end: 심은 날부터 정리까지 일수 / lime: 석회고토 필요 / mulch: 멀칭
+// s: [심은 날 기준 일수, 할 일, 종류, 반복 간격, 반복 끝]
+const CROPS = {
+  pepper:{n:'고추',f:'가지과',e:'🌶️',w:[[5,10]],lime:1,mulch:1,end:160,
+    note:'물 빠짐이 중요. 장마 뒤 탄저병이 가장 큰 적이라 병든 열매는 보이는 대로 밭 밖으로.',
+    s:[[0,'정식 · 지주 세우기 · 물 듬뿍','care'],[3,'활착 확인, 흙 마르면 물','water'],[14,'1차 줄 매기','care'],
+       [20,'방아다리 아래 곁순 모두 제거','prune'],[30,'1차 웃거름 (포기 사이 한 줌)','fert'],
+       [30,'탄저병·역병 예방 미생물제 살포','pest',10,110],[40,'2차 줄 매기','care'],[50,'2차 웃거름','fert'],
+       [55,'풋고추 수확 시작','harvest'],[60,'3차 줄 매기','care'],[70,'3차 웃거름 · 칼슘 엽면시비','fert'],
+       [90,'홍고추 수확 (병든 열매 즉시 제거)','harvest',10,150]]},
+  tomato:{n:'방울토마토',f:'가지과',e:'🍅',w:[[5,5]],lime:1,mulch:1,end:120,
+    note:'곁순은 손으로 일주일마다. 비 맞으면 열과가 생기니 장마 때 수확을 서두르기.',
+    s:[[0,'정식 · 지주(2m) 세우기','care'],[7,'곁순 제거 · 줄기 유인','prune',7,100],[21,'1차 웃거름','fert'],
+       [30,'잎곰팡이·역병 예방 미생물제','pest',14,100],[40,'2차 웃거름','fert'],[55,'3차 웃거름','fert'],
+       [55,'첫 수확 (매일 확인)','harvest'],[75,'원줄기 순지르기 (지주 끝 닿으면)','prune']]},
+  eggplant:{n:'가지',f:'가지과',e:'🍆',w:[[5,10]],lime:1,mulch:1,end:150,
+    note:'거름과 물을 많이 먹는 작물. 마르면 열매가 딱딱해짐.',
+    s:[[0,'정식 · 지주 세우기','care'],[14,'첫 꽃 아래 곁순 2개 남겨 3줄기 유인, 나머지 제거','prune'],
+       [20,'진딧물·응애 확인 (난황유·미생물)','pest',14,120],[25,'웃거름','fert',20,125],
+       [35,'첫 열매는 작을 때 따기','harvest'],[45,'본격 수확 (2~3일마다)','harvest'],
+       [90,'갱신전정 (가지 1/2 잘라 가을가지 받기)','prune']]},
+  potato:{n:'감자',f:'가지과',e:'🥔',w:[[3,25]],lime:0,mulch:1,end:95,
+    note:'석회를 넣으면 더뎅이병이 생겨서 석회고토 생략. 고추·토마토와 같은 가지과라 연작 주의.',
+    s:[[0,'씨감자 심기 (절단면 말려서, 10~15cm 깊이)','care'],[25,'싹 올라오면 멀칭 구멍 내기 · 굵은 싹 1~2개만 남기기','prune'],
+       [35,'1차 북주기','care'],[50,'2차 북주기 + 웃거름','fert'],[60,'꽃대 따기 (선택)','prune'],
+       [90,'수확 (잎·줄기 누렇게, 맑은 날)','harvest']]},
+  cucumber:{n:'오이',f:'박과',e:'🥒',w:[[5,5]],lime:1,mulch:1,end:100,
+    note:'뿌리가 얕아 가뭄에 약함. 열매가 굽으면 거름·물 부족 신호.',
+    s:[[0,'정식 · 오이망/지주 설치','care'],[7,'5~6마디 아래 아들줄기·꽃 모두 제거','prune'],[14,'덩굴 유인','care',7,70],
+       [20,'웃거름','fert',15,80],[25,'흰가루병·노균병 예방 미생물제','pest',14,90],[30,'첫 수확 (어릴 때 자주)','harvest'],
+       [40,'아들줄기 잎 2장 남기고 순지르기','prune']]},
+  zucchini:{n:'애호박',f:'박과',e:'🫑',w:[[5,5]],lime:1,mulch:1,end:130,
+    note:'벌이 적으면 열매가 떨어지니 아침에 인공수분.',
+    s:[[0,'정식','care'],[20,'웃거름','fert',20,110],[25,'아침에 인공수분 (수꽃 → 암꽃)','care'],
+       [30,'흰가루병 확인 · 미생물제','pest',14,110],[35,'수확 시작 (작을 때 따야 계속 열림)','harvest']]},
+  squash:{n:'단호박',f:'박과',e:'🎃',w:[[5,10]],lime:1,mulch:1,end:100,
+    note:'덩굴이 넓게 퍼지니 구역 2개 이상 잡거나 지주로 올리기.',
+    s:[[0,'정식','care'],[20,'어미덩굴 5~6마디 순지르기 → 아들덩굴 2~3개 유인','prune'],[30,'웃거름','fert'],
+       [35,'인공수분','care'],[50,'열매 밑 받침 깔기','care'],[95,'수확 (꼭지가 코르크처럼 마르면)','harvest']]},
+  melon:{n:'참외',f:'박과',e:'🍈',w:[[5,5]],lime:1,mulch:1,end:100,
+    note:'손자덩굴에 열매가 달림. 순지르기가 수확량을 좌우.',
+    s:[[0,'정식','care'],[10,'어미덩굴 4~5마디에서 순지르기','prune'],[25,'아들덩굴 정리 · 손자덩굴에 착과','prune'],
+       [30,'웃거름','fert'],[70,'수확 (노랗게 익고 향 날 때)','harvest']]},
+  lettuce:{n:'상추',f:'국화과',e:'🥬',w:[[4,10],[9,5]],lime:1,mulch:0,end:70,
+    note:'여름 고온엔 꽃대가 금방 올라옴. 봄·가을 두 번 키우기.',
+    s:[[0,'정식 · 물 듬뿍','care'],[7,'건조하면 물 (뿌리 얕음)','water'],[20,'웃거름 (액비)','fert'],
+       [25,'겉잎부터 수확 시작','harvest'],[45,'웃거름','fert'],[65,'꽃대 올라오면 정리','care']]},
+  kale:{n:'케일',f:'배추과',e:'🥗',w:[[4,10],[8,25]],lime:1,mulch:0,end:120,
+    note:'배추흰나비 애벌레가 가장 큰 문제. 한랭사를 씌우면 편함.',
+    s:[[0,'정식','care'],[10,'애벌레 확인 (BT제)','pest',10,100],[20,'웃거름','fert',20,100],[30,'아랫잎부터 수확','harvest']]},
+  cabbage:{n:'배추 (김장)',f:'배추과',e:'🥬',w:[[8,28]],lime:1,mulch:0,end:85,
+    note:'석회·붕소가 부족하면 속썩음. 밑거름에 붕사 소량. 정식이 늦으면 결구가 안 됨.',
+    s:[[0,'정식 · 물 듬뿍','care'],[5,'벌레 확인 · BT제/미생물 살포','pest',7,56],[15,'1차 웃거름','fert'],
+       [30,'2차 웃거름','fert'],[45,'3차 웃거름','fert'],[65,'겉잎 모아 묶기 (서리 대비)','care'],[80,'수확 (김장)','harvest']]},
+  radish:{n:'무 (가을)',f:'배추과',e:'🥕',w:[[8,25]],lime:1,mulch:0,end:80,
+    note:'돌·덜 썩은 거름이 있으면 가랑이 무가 됨. 흙을 깊게 부드럽게.',
+    s:[[0,'파종 (구멍당 3~4알)','care'],[7,'벼룩잎벌레 확인','pest',7,35],[10,'1차 솎기 (2포기)','prune'],
+       [20,'2차 솎기 (1포기)','prune'],[25,'1차 웃거름','fert'],[40,'2차 웃거름 + 북주기','fert'],[75,'수확 (영하 전에)','harvest']]},
+  spinach:{n:'시금치',f:'비름과',e:'🌿',w:[[9,10]],lime:1,mulch:0,end:60,
+    note:'산성 흙에 아주 약함. 석회고토를 꼭.',
+    s:[[0,'파종 (줄뿌림)','care'],[15,'솎기','prune'],[25,'웃거름 (액비)','fert'],[45,'수확','harvest']]},
+  scallion:{n:'쪽파',f:'백합과',e:'🧅',w:[[8,25]],lime:1,mulch:0,end:70,
+    s:[[0,'종구 심기','care'],[20,'웃거름','fert'],[40,'웃거름','fert'],[55,'수확','harvest']]},
+  leek:{n:'대파',f:'백합과',e:'🧅',w:[[5,1]],lime:1,mulch:0,end:180,
+    note:'흰 부분을 길게 하려면 북주기를 여러 번.',
+    s:[[0,'모종 심기 (골 파서 깊게)','care'],[30,'웃거름 + 북주기','fert',30,150],[120,'수확 시작','harvest']]},
+  garlic:{n:'마늘',f:'백합과',e:'🧄',w:[[10,15]],lime:1,mulch:1,end:240,
+    note:'가을에 심어 이듬해 6월 수확. 그동안 이 구역은 비어 있지 않음.',
+    s:[[0,'쪽 심기 (뾰족한 쪽 위, 5cm 깊이)','care'],[20,'짚·부직포 덮어 월동','care'],
+       [140,'비닐에 갇힌 싹 꺼내주기','care'],[150,'1차 웃거름 (3월)','fert'],[180,'2차 웃거름 (4월)','fert'],
+       [180,'잎마름병 예방 미생물제','pest'],[215,'마늘쫑 뽑기','prune'],[240,'수확 (잎 절반 누렇게)','harvest']]},
+  onion:{n:'양파',f:'백합과',e:'🧅',w:[[10,28]],lime:1,mulch:1,end:225,
+    s:[[0,'모종 정식 (흰 부분만 묻게)','care'],[20,'월동 덮개','care'],[125,'1차 웃거름 (3월 초)','fert'],
+       [155,'2차 웃거름','fert'],[175,'노균병 예방','pest'],[220,'수확 (줄기 쓰러지면)','harvest']]},
+  carrot:{n:'당근',f:'산형과',e:'🥕',w:[[7,20]],lime:1,mulch:0,end:110,
+    note:'발아가 제일 어려움. 싹 날 때까지 흙을 마르지 않게.',
+    s:[[0,'파종 (물 충분히)','care'],[2,'발아 전까지 물','water',2,12],[25,'1차 솎기','prune'],
+       [45,'2차 솎기 + 웃거름','fert'],[100,'수확','harvest']]},
+  soy:{n:'콩',f:'콩과',e:'🫘',w:[[6,10]],lime:1,mulch:0,end:140,
+    note:'질소비료는 거의 필요 없음. 가지과·박과 다음에 심으면 땅 회복에 좋음.',
+    s:[[0,'파종 (구멍당 2~3알, 새 피해 주의)','care'],[20,'솎기 (2포기)','prune'],[35,'순지르기 (본잎 5~6장)','prune'],
+       [40,'북주기','care'],[70,'노린재 확인','pest',14,110],[135,'수확','harvest']]},
+  peanut:{n:'땅콩',f:'콩과',e:'🥜',w:[[5,10]],lime:1,mulch:1,end:140,
+    note:'칼슘이 부족하면 빈 꼬투리가 많아짐.',
+    s:[[0,'파종','care'],[40,'멀칭 걷고 북주기 (씨방자루 들어가게)','care'],[45,'석회(칼슘) 웃거름','fert'],[135,'수확','harvest']]},
+  corn:{n:'옥수수',f:'벼과',e:'🌽',w:[[4,25]],lime:1,mulch:1,end:90,
+    note:'한 줄로 심으면 수정이 잘 안 됨. 2줄 이상 모아심기.',
+    s:[[0,'파종/정식','care'],[20,'솎기 (1포기)','prune'],[30,'1차 웃거름','fert'],[45,'2차 웃거름 + 북주기','fert'],
+       [50,'곁가지 제거 (선택)','prune'],[55,'조명나방 확인','pest'],[85,'수확 (수염 갈색)','harvest']]},
+  sweetpotato:{n:'고구마',f:'메꽃과',e:'🍠',w:[[5,15]],lime:0,mulch:1,end:130,
+    note:'질소가 많으면 덩굴만 무성. 밑거름 적게, 석회 생략.',
+    s:[[0,'순 심기 (비 온 뒤나 흐린 날)','care'],[3,'활착까지 물','water',2,9],[40,'김매기','care'],
+       [70,'덩굴 들어올리기 (마디 뿌리 끊기)','care'],[125,'수확 (서리 전)','harvest']]},
+};
+const FAMILIES = ['가지과','박과','배추과','국화과','비름과','백합과','산형과','콩과','벼과','메꽃과','기타'];
+const HEAVY = ['가지과','박과']; // 3~4년 간격 권장
+const TYPES = {prep:'밭준비',fert:'거름',prune:'순·솎기',pest:'방제',water:'물',harvest:'수확',care:'관리'};
+const REGIONS = {0:'중부 (서울·경기)',[-10]:'남부',7:'강원 산간'};
+const TIPS = {
+  1:'휴경기. 밭 계획을 세우고 씨앗·퇴비를 준비하세요.',
+  2:'퇴비가 덜 썩었다면 지금 뒤집어 주세요. 마늘·양파 멀칭 속 싹을 확인.',
+  3:'흙이 녹으면 석회고토부터. 퇴비는 석회 1~2주 뒤에 넣어야 해요.',
+  4:'늦서리는 4월 말까지 와요. 고추·토마토는 5월 초 이후 정식.',
+  5:'정식 직후엔 아침에 물을 충분히. 지주와 줄 매기를 미루지 마세요.',
+  6:'장마 전 배수로 정비, 마늘·양파·감자 수확. 곁순 제거를 매주.',
+  7:'장마 뒤 탄저병·흰가루병이 번져요. 병든 잎·열매는 밭 밖으로.',
+  8:'폭염엔 아침·저녁에 물. 말일에 김장배추·무 준비 (석회고토 → 퇴비).',
+  9:'배추벌레를 매주 확인. 가을 상추·시금치 파종 시기.',
+  10:'마늘·양파 심는 달. 여름 작물 잔재는 병이 없을 때만 밭에 두세요.',
+  11:'김장 수확 후 깊이갈이로 해충 월동처를 깨 주세요. 녹비(호밀·헤어리베치)도 좋아요.',
+  12:'휴경기. 올해 연작 기록을 보고 내년 배치를 정하세요.'};
+
+// ───────── 유틸 ─────────
+const $ = s => document.querySelector(s);
+const pad = n => String(n).padStart(2,'0');
+const ds = d => `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+const pd = s => { const [y,m,d] = s.split('-').map(Number); return new Date(y,m-1,d,12); };
+const addD = (s,n) => { const d = pd(s); d.setDate(d.getDate()+n); return ds(d); };
+const gap = (a,b) => Math.round((pd(b)-pd(a))/864e5);
+const today = () => ds(new Date());
+const md = s => { const d = pd(s); return `${d.getMonth()+1}/${d.getDate()}`; };
+const uid = () => Math.random().toString(36).slice(2,10);
+const esc = s => String(s??'').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const WD = ['일','월','화','수','목','금','토'];
+
+// ───────── 데이터 ─────────
+const LS = 'garden-data', LSS = 'garden-sync';
+let S = load();
+function load(){
+  try { const d = JSON.parse(localStorage.getItem(LS)); if (d && d.beds) return d; } catch(e){}
+  return {v:1, updatedAt:0, shift:0, beds:[{name:'1고랑',zones:6},{name:'2고랑',zones:6}], plantings:[], tasks:[]};
+}
+function commit(){ S.updatedAt = Date.now(); try{ localStorage.setItem(LS, JSON.stringify(S)); }catch(e){} schedulePush(); render(); }
+
+const cropOf = p => p.crop === 'custom' ? {n:p.name||'기타', f:p.family||'기타', e:'🌱', s:[], end:p.days||90, lime:1, mulch:0} : CROPS[p.crop];
+const endOf = p => addD(p.date, cropOf(p).end);
+const zLabel = z => { const [b,i] = z.split('-').map(Number); return `${b+1}-${i+1}`; };
+const zLong = z => { const [b,i] = z.split('-').map(Number); return `${S.beds[b]?.name||''} ${i+1}구역`; };
+const plantName = p => { const c = cropOf(p); return `${c.e} ${c.n}`; };
+
+function genTasks(p, prep){
+  const c = cropOf(p), out = [];
+  const push = (o,title,type) => out.push({id:uid(), pid:p.id, date:addD(p.date,o), title, type, done:false});
+  if (prep){
+    if (c.lime) push(-21,'석회고토 살포 (㎡당 100~150g) · 흙 갈기','prep');
+    push(-14,'완숙퇴비(㎡당 2~3kg) · 밑거름 넣고 갈기','prep');
+    push(-10,'토양 미생물제 살포 (고초균·EM)','prep');
+    push(-7, c.mulch ? '두둑 만들기 · 검정 멀칭' : '두둑 만들기','prep');
+  }
+  for (const [o,t,ty,ev,until] of c.s){
+    if (ev) for (let k=o; k<=until; k+=ev) push(k,t,ty); else push(o,t,ty);
+  }
+  push(c.end,'수확 마무리 · 잔재 정리 (병든 잎은 밭 밖으로)','prep');
+  return out;
+}
+
+// 연작·겹침 경고
+function checkZones(family, zones, date, end, exclude){
+  const warn = [];
+  for (const z of zones){
+    for (const p of S.plantings){
+      if (p.id === exclude || !p.zones.includes(z)) continue;
+      const c = cropOf(p), pe = endOf(p);
+      if (p.date <= end && pe >= date){ warn.push(`${zLabel(z)}: ${c.n}이(가) ${md(pe)}까지 자라는 중`); continue; }
+      if (c.f !== family || family === '기타' || pe > date) continue;
+      const g = gap(pe, date);
+      if (g < 365) warn.push(`${zLabel(z)}: ${p.date.slice(0,4)}년 ${c.n}(${family}) 바로 다음 — 연작 피해 우려`);
+      else if (g < 730 && HEAVY.includes(family)) warn.push(`${zLabel(z)}: 2년 안에 ${c.n}(${family}) — ${family}는 3~4년 간격 권장`);
+    }
+  }
+  return warn;
+}
+function zoneWarn(z, year){
+  return S.plantings.filter(p => p.zones.includes(z) && p.date.slice(0,4) == year)
+    .some(p => checkZones(cropOf(p).f, [z], p.date, endOf(p), p.id).some(w => w.includes('연작') || w.includes('간격')));
+}
+
+// ───────── 동기화 (GitHub 비공개 저장소) ─────────
+let SY = (() => { try { return JSON.parse(localStorage.getItem(LSS)) || {}; } catch(e){ return {}; } })();
+let sha = null, pushT = null, syncing = false;
+const ghUrl = () => `https://api.github.com/repos/${SY.owner}/${SY.repo}/contents/${SY.path||'data.json'}`;
+const ghH = () => ({Authorization:'Bearer '+SY.token, Accept:'application/vnd.github+json'});
+const b64e = str => { const b = new TextEncoder().encode(str); let s=''; for (let i=0;i<b.length;i+=8192) s += String.fromCharCode.apply(null, b.subarray(i,i+8192)); return btoa(s); };
+const b64d = s => new TextDecoder().decode(Uint8Array.from(atob(s.replace(/\n/g,'')), c => c.charCodeAt(0)));
+function setSync(cls, txt){ const e = $('#sync'); e.className = cls; e.querySelector('span').textContent = txt; }
+async function sync(){
+  if (!SY.token || !SY.owner || !SY.repo){ setSync('', '로컬'); return; }
+  if (syncing){ schedulePush(); return; }
+  syncing = true; setSync('busy','동기화 중');
+  try {
+    const r = await fetch(ghUrl()+'?t='+Date.now(), {headers:ghH(), cache:'no-store'});
+    let remote = null;
+    if (r.ok){ const j = await r.json(); sha = j.sha; remote = JSON.parse(b64d(j.content)); }
+    else if (r.status !== 404) throw new Error('읽기 '+r.status);
+    if (remote && remote.updatedAt > S.updatedAt){
+      S = remote; localStorage.setItem(LS, JSON.stringify(S)); render();
+    } else if (!remote || remote.updatedAt < S.updatedAt){
+      const body = {message:'텃밭 기록 '+new Date().toLocaleString('ko-KR'), content:b64e(JSON.stringify(S))};
+      if (sha) body.sha = sha;
+      const w = await fetch(ghUrl(), {method:'PUT', headers:ghH(), body:JSON.stringify(body)});
+      if (!w.ok) throw new Error('저장 '+w.status);
+      sha = (await w.json()).content.sha;
+    }
+    setSync('ok','동기화됨');
+  } catch(e){ setSync('err', navigator.onLine ? '동기화 실패' : '오프라인'); console.warn(e); }
+  syncing = false;
+}
+function schedulePush(){ clearTimeout(pushT); pushT = setTimeout(sync, 1500); }
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') sync(); });
+
+// ───────── 화면 ─────────
+const now = new Date();
+let view = 'todo', year = now.getMonth() >= 10 ? now.getFullYear()+1 : now.getFullYear();
+let calM = ds(new Date(now.getFullYear(), now.getMonth(), 1)), calSel = today();
+
+function taskRow(k){
+  const p = S.plantings.find(x => x.id === k.pid);
+  const late = !k.done && k.date < today();
+  return `<div class="task ${k.done?'done':''}" data-act="editTask" data-id="${k.id}">
+    <button class="chk" data-act="toggle" data-id="${k.id}">${k.done?'✓':''}</button>
+    <div class="tb"><div class="tt">${esc(k.title)}</div>
+      <div class="tm"><span class="${late?'late':''}">${md(k.date)} (${WD[pd(k.date).getDay()]})</span>
+      <span class="tag t-${k.type}">${TYPES[k.type]||'관리'}</span>
+      ${p ? `<span>${plantName(p)} · ${p.zones.map(zLabel).join(', ')}</span>` : ''}</div></div></div>`;
+}
+const listCard = arr => `<div class="card">${arr.map(taskRow).join('')}</div>`;
+
+function vTodo(){
+  const t = today(), w = addD(t,7), m = addD(t,30);
+  const ts = [...S.tasks].sort((a,b) => a.date.localeCompare(b.date));
+  const late = ts.filter(k => !k.done && k.date < t);
+  const td = ts.filter(k => k.date === t);
+  const wk = ts.filter(k => k.date > t && k.date <= w);
+  const nx = ts.filter(k => !k.done && k.date > w && k.date <= m);
+  let h = `<div class="card tip"><b>${now.getMonth()+1}월</b> · ${TIPS[now.getMonth()+1]}</div>`;
+  if (!S.plantings.length && !S.tasks.length)
+    h += `<div class="empty">아직 심은 작물이 없어요.<br><br><button class="btn pri" data-act="view" data-v="map">배치도에서 작물 심기</button></div>`;
+  if (late.length) h += `<h2 class="late">밀린 일 ${late.length}</h2>` + listCard(late);
+  h += `<h2>오늘</h2>` + (td.length ? listCard(td) : `<div class="card empty" style="padding:12px">오늘 할 일 없음</div>`);
+  if (wk.length) h += `<h2>이번 주</h2>` + listCard(wk);
+  if (nx.length) h += `<h2>한 달 안</h2>` + listCard(nx);
+  h += `<div class="row" style="margin-top:14px"><button class="btn" data-act="newTask">+ 할 일 직접 추가</button></div>`;
+  return h;
+}
+
+function vMap(){
+  const y0 = `${year}-01-01`, y1 = `${year}-12-31`, t = today();
+  let h = `<div class="ynav"><button data-act="year" data-d="-1">‹</button><b>${year}년</b><button data-act="year" data-d="1">›</button></div>`;
+  h += `<div class="beds" style="grid-template-columns:repeat(${S.beds.length},1fr)">`;
+  S.beds.forEach((b,bi) => {
+    h += `<div class="bed"><h3>${esc(b.name)}</h3>`;
+    for (let zi=0; zi<b.zones; zi++){
+      const z = `${bi}-${zi}`;
+      const ps = S.plantings.filter(p => p.zones.includes(z) && p.date <= y1 && endOf(p) >= y0).sort((a,b) => a.date.localeCompare(b.date));
+      h += `<button class="zone" data-act="zone" data-z="${z}"><div class="zl"><span>${zi+1}구역</span>${zoneWarn(z,year)?'<span class="warn">⚠ 연작</span>':''}</div>`;
+      h += ps.map(p => { const e = endOf(p); const cls = e < t ? 'past' : (p.date <= t ? 'now' : '');
+        return `<span class="chip ${cls}">${plantName(p)}<small>${p.date.slice(0,4)!=year?p.date.slice(2,4)+'.':''}${md(p.date)}~${e.slice(0,4)!=year?e.slice(2,4)+'.':''}${md(e)}</small></span>`; }).join('');
+      h += `</button>`;
+    }
+    h += `</div>`;
+  });
+  h += `</div><div class="legend">구역을 누르면 심기·이력을 볼 수 있어요. 초록 테두리 = 지금 자라는 중.</div>`;
+  return h;
+}
+
+function vCal(){
+  const m0 = pd(calM), y = m0.getFullYear(), m = m0.getMonth();
+  const first = new Date(y,m,1,12), start = new Date(first); start.setDate(1 - first.getDay());
+  const byDate = {}; S.tasks.forEach(k => (byDate[k.date] ||= []).push(k));
+  let h = `<div class="ynav"><button data-act="mon" data-d="-1">‹</button><b>${y}. ${m+1}</b><button data-act="mon" data-d="1">›</button></div><div class="cal">`;
+  h += WD.map(d => `<div class="h">${d}</div>`).join('');
+  for (let i=0;i<42;i++){
+    const d = new Date(start); d.setDate(start.getDate()+i); const s = ds(d), ks = byDate[s]||[];
+    const types = [...new Set(ks.filter(k=>!k.done).map(k => k.type))].slice(0,4);
+    h += `<button data-act="day" data-d="${s}" class="${d.getMonth()!==m?'o':''} ${s===today()?'td':''} ${s===calSel?'sel':''}">${d.getDate()}<span class="dots">${types.map(t=>`<i class="t-${t}"></i>`).join('')}</span></button>`;
+  }
+  h += `</div>`;
+  const sel = (byDate[calSel]||[]);
+  h += `<h2>${md(calSel)} (${WD[pd(calSel).getDay()]})</h2>` + (sel.length ? listCard(sel) : `<div class="card empty" style="padding:12px">할 일 없음</div>`);
+  const growing = S.plantings.filter(p => p.date <= calSel && endOf(p) >= calSel);
+  if (growing.length) h += `<div class="legend">이날 밭에 있는 작물: ${growing.map(p => `${plantName(p)}(${p.zones.map(zLabel).join(',')})`).join(' · ')}</div>`;
+  h += `<div class="legend" style="margin-top:12px">${Object.entries(TYPES).map(([k,v]) => `<span class="tag t-${k}">${v}</span>`).join(' ')}</div>`;
+  return h;
+}
+
+function vCrops(){
+  let h = `<div class="card tip"><b>밭 준비 순서</b><br>석회고토 → (1~2주) → 완숙퇴비·밑거름 → 미생물제 → (1주) → 두둑·멀칭 → 정식<br>
+    <span style="font-size:13px">석회와 퇴비·비료를 한 번에 넣으면 암모니아 가스가 나와 뿌리가 상해요. 작물을 심으면 이 일정이 자동으로 들어갑니다.</span></div>
+    <div class="card"><b>돌려짓기 (연작 피하기)</b><br><span style="font-size:14px">같은 과를 같은 자리에 이어 심지 않기. 가지과·박과는 3~4년, 나머지는 1~2년 간격.<br>
+    추천 순서: <b>가지과·박과</b>(거름 많이) → <b>배추과·잎채소</b> → <b>콩과</b>(땅 회복) → <b>뿌리채소·백합과</b></span></div>`;
+  for (const f of FAMILIES){
+    const cs = Object.entries(CROPS).filter(([,c]) => c.f === f);
+    if (!cs.length) continue;
+    h += `<h2>${f}${HEAVY.includes(f)?' · 연작 주의':''}</h2>`;
+    for (const [,c] of cs){
+      const sch = c.s.map(([o,t,ty,ev,u]) => `<b>${o===0?'심는 날':'+'+o+'일'}</b><span><span class="tag t-${ty}">${TYPES[ty]}</span> ${esc(t)}${ev?` <small>(${ev}일마다 ~${u}일)</small>`:''}</span>`).join('');
+      h += `<details class="crop"><summary>${c.e}<span>${c.n}</span><small>${c.w.map(([m,d])=>`${m}/${d}`).join(', ')} 무렵</small></summary><div class="body">
+        <div style="font-size:13px;color:var(--sub)">석회고토 ${c.lime?'필요':'생략'} · 멀칭 ${c.mulch?'함':'안 함'} · 심고 약 ${c.end}일 뒤 정리</div>
+        ${c.note?`<div class="note">${esc(c.note)}</div>`:''}<div class="sch">${sch}</div></div></details>`;
+    }
+  }
+  return h;
+}
+
+function vSet(){
+  return `<h2>밭 구성</h2><div class="card">
+    ${S.beds.map((b,i) => `<div class="row" style="margin-bottom:8px"><input style="flex:2" data-bed="${i}" data-k="name" value="${esc(b.name)}">
+      <input style="flex:1" type="number" min="1" max="20" data-bed="${i}" data-k="zones" value="${b.zones}"><span>구역</span></div>`).join('')}
+    <div class="row"><button class="btn sm" data-act="saveBeds">저장</button></div>
+    <label>지역 (기본 심는 날짜 조정)</label>
+    <select id="shift">${Object.entries(REGIONS).map(([k,v]) => `<option value="${k}" ${S.shift==k?'selected':''}>${v}</option>`).join('')}</select>
+  </div>
+  <h2>폰·맥 동기화 (GitHub 비공개 저장소)</h2><div class="card">
+    <label>GitHub 계정</label><input id="sy-owner" value="${esc(SY.owner||'')}" autocapitalize="off">
+    <label>저장소</label><input id="sy-repo" value="${esc(SY.repo||'')}" placeholder="garden-data" autocapitalize="off">
+    <label>파일</label><input id="sy-path" value="${esc(SY.path||'data.json')}" autocapitalize="off">
+    <label>토큰 (이 기기에만 저장됨)</label><input id="sy-token" type="password" value="${esc(SY.token||'')}" autocapitalize="off">
+    <div class="row" style="margin-top:12px"><button class="btn pri" data-act="saveSync">저장하고 동기화</button></div>
+  </div>
+  <h2>백업</h2><div class="card row">
+    <button class="btn sm" data-act="export">JSON 내보내기</button>
+    <label class="btn sm" style="margin:0;color:var(--ink)">불러오기<input type="file" accept=".json" id="imp" hidden></label>
+  </div>
+  <div class="legend">작물 ${S.plantings.length}건 · 할 일 ${S.tasks.length}건</div>`;
+}
+
+function render(){
+  document.querySelectorAll('#nav button').forEach(b => b.classList.toggle('on', b.dataset.v === view));
+  $('#main').innerHTML = {todo:vTodo, map:vMap, cal:vCal, crops:vCrops, set:vSet}[view]();
+}
+
+// ───────── 시트 (팝업) ─────────
+function openSheet(html){ $('#sheet').innerHTML = html; document.body.classList.add('sh'); }
+function closeSheet(){ document.body.classList.remove('sh'); }
+
+function zoneSheet(z){
+  const ps = S.plantings.filter(p => p.zones.includes(z)).sort((a,b) => b.date.localeCompare(a.date));
+  const since = addD(`${year}-01-01`, -730);
+  const used = [...new Set(ps.filter(p => endOf(p) >= since && p.date < `${year}-01-01`).map(p => cropOf(p).f))];
+  const rec = ['가지과','박과','배추과','콩과','백합과','국화과','산형과'].filter(f => !used.includes(f));
+  openSheet(`<h3>${zLong(z)}</h3>
+    ${used.length ? `<div class="wbox">최근 2년 사용: ${used.join(', ')}</div>` : ''}
+    <div class="okbox">${year}년 추천: ${rec.join(', ')}</div>
+    <h2>심은 기록</h2>
+    ${ps.length ? `<div class="hist">${ps.map(p => `<b>${p.date.slice(0,4)}</b><span data-act="editPlant" data-id="${p.id}" style="text-decoration:underline">${plantName(p)} (${cropOf(p).f}) ${md(p.date)}~${md(endOf(p))}</span>`).join('')}</div>` : '<div class="legend">기록 없음</div>'}
+    <div class="acts"><button class="btn" data-act="close">닫기</button><button class="btn pri" data-act="newPlant" data-z="${z}">+ 이 구역에 심기</button></div>`);
+}
+
+let draft = null;
+function plantSheet(p, isNew){
+  draft = JSON.parse(JSON.stringify(p));
+  const opts = FAMILIES.map(f => { const cs = Object.entries(CROPS).filter(([,c]) => c.f === f);
+    return cs.length ? `<optgroup label="${f}">${cs.map(([k,c]) => `<option value="${k}" ${draft.crop===k?'selected':''}>${c.e} ${c.n}</option>`).join('')}</optgroup>` : ''; }).join('');
+  openSheet(`<h3>${isNew?'작물 심기':'작물 수정'}</h3>
+    <label>작물</label><select id="p-crop">${opts}<option value="custom" ${draft.crop==='custom'?'selected':''}>✏️ 직접 입력</option></select>
+    <div id="p-custom" ${draft.crop==='custom'?'':'hidden'}>
+      <label>이름</label><input id="p-name" value="${esc(draft.name||'')}">
+      <label>과 (연작 확인용)</label><select id="p-fam">${FAMILIES.map(f => `<option ${draft.family===f?'selected':''}>${f}</option>`).join('')}</select>
+      <label>재배 기간 (일)</label><input id="p-days" type="number" value="${draft.days||90}">
+    </div>
+    <label>심는 날 (정식·파종)</label><input id="p-date" type="date" value="${draft.date}">
+    <label>구역</label><div class="zsel" id="p-zones"></div>
+    ${isNew ? `<label style="display:flex;gap:8px;align-items:center;color:var(--ink);font-size:14px"><input type="checkbox" id="p-prep" checked> 밭 준비 일정도 넣기 (석회·퇴비·미생물·멀칭)</label>` : ''}
+    <label>메모</label><textarea id="p-memo" rows="2">${esc(draft.memo||'')}</textarea>
+    <div id="p-warn"></div>
+    <div class="acts">${isNew ? '<button class="btn" data-act="close">취소</button>' : `<button class="btn del" data-act="delPlant">삭제</button>`}
+      <button class="btn pri" data-act="savePlant" data-new="${isNew?1:''}">저장</button></div>`);
+  drawPlantExtras();
+}
+function drawPlantExtras(){
+  $('#p-zones').innerHTML = S.beds.map((b,bi) => `<div class="bn">${esc(b.name)}</div>` +
+    Array.from({length:b.zones}, (_,zi) => `<button data-act="zt" data-z="${bi}-${zi}" class="${draft.zones.includes(bi+'-'+zi)?'on':''}">${zi+1}</button>`).join('')).join('');
+  const c = cropOf(draft);
+  const w = draft.zones.length ? checkZones(c.f, draft.zones, draft.date, endOf(draft), draft.id) : [];
+  const n = genTasks(draft, $('#p-prep')?.checked).length;
+  $('#p-warn').innerHTML = (w.length ? `<div class="wbox">⚠ ${w.map(esc).join('<br>⚠ ')}</div>` : (draft.zones.length ? '<div class="okbox">연작 문제 없음</div>' : '<div class="wbox">구역을 골라 주세요</div>'))
+    + `<div class="legend">${md(draft.date)} 심기 → ${md(endOf(draft))} 무렵 정리 · 할 일 ${n}개 자동 생성</div>`;
+}
+function readDraft(){
+  draft.crop = $('#p-crop').value; draft.date = $('#p-date').value || draft.date;
+  draft.memo = $('#p-memo').value;
+  if (draft.crop === 'custom'){ draft.name = $('#p-name').value.trim(); draft.family = $('#p-fam').value; draft.days = +$('#p-days').value || 90; }
+}
+function defaultDate(crop){
+  const c = CROPS[crop]; if (!c) return `${year}-05-01`;
+  const t = today();
+  const cands = c.w.map(([m,d]) => addD(`${year}-${pad(m)}-${pad(d)}`, +S.shift||0));
+  return cands.find(s => s >= t) || cands[0];
+}
+
+function taskSheet(k){
+  const isNew = !k;
+  k = k || {id:uid(), date:calSel > today() ? calSel : today(), title:'', type:'care', done:false};
+  openSheet(`<h3>${isNew?'할 일 추가':'할 일'}</h3>
+    <label>내용</label><input id="k-title" value="${esc(k.title)}">
+    <label>날짜</label><input id="k-date" type="date" value="${k.date}">
+    <label>종류</label><select id="k-type">${Object.entries(TYPES).map(([a,b]) => `<option value="${a}" ${k.type===a?'selected':''}>${b}</option>`).join('')}</select>
+    <div class="acts">${isNew?'<button class="btn" data-act="close">취소</button>':`<button class="btn del" data-act="delTask" data-id="${k.id}">삭제</button>`}
+    <button class="btn pri" data-act="saveTask" data-id="${k.id}" data-new="${isNew?1:''}">저장</button></div>`);
+}
+
+// ───────── 이벤트 ─────────
+const A = {
+  view: d => { view = d.v; closeSheet(); render(); scrollTo(0,0); },
+  close: () => closeSheet(),
+  year: d => { year += +d.d; render(); },
+  mon: d => { const x = pd(calM); x.setMonth(x.getMonth() + +d.d); calM = ds(x); render(); },
+  day: d => { calSel = d.d; render(); },
+  toggle: d => { const k = S.tasks.find(x => x.id === d.id); k.done = !k.done; commit(); },
+  editTask: d => taskSheet(S.tasks.find(x => x.id === d.id)),
+  newTask: () => taskSheet(null),
+  saveTask: d => {
+    const title = $('#k-title').value.trim(); if (!title) return;
+    let k = S.tasks.find(x => x.id === d.id);
+    if (!k){ k = {id:d.id, done:false}; S.tasks.push(k); }
+    Object.assign(k, {title, date:$('#k-date').value || today(), type:$('#k-type').value});
+    closeSheet(); commit();
+  },
+  delTask: d => { if (!confirm('이 할 일을 지울까요?')) return; S.tasks = S.tasks.filter(x => x.id !== d.id); closeSheet(); commit(); },
+  zone: d => zoneSheet(d.z),
+  newPlant: d => plantSheet({id:uid(), crop:'pepper', date:defaultDate('pepper'), zones:[d.z], memo:''}, true),
+  editPlant: d => plantSheet(S.plantings.find(p => p.id === d.id), false),
+  zt: d => { readDraft(); const i = draft.zones.indexOf(d.z); i<0 ? draft.zones.push(d.z) : draft.zones.splice(i,1); drawPlantExtras(); },
+  savePlant: d => {
+    readDraft();
+    if (!draft.zones.length) return alert('구역을 골라 주세요');
+    if (draft.crop === 'custom' && !draft.name) return alert('작물 이름을 적어 주세요');
+    if (d.new){
+      S.plantings.push(draft); S.tasks.push(...genTasks(draft, $('#p-prep').checked));
+    } else {
+      const old = S.plantings.find(p => p.id === draft.id);
+      const changed = old.crop !== draft.crop || old.date !== draft.date || old.days !== draft.days;
+      Object.assign(old, draft);
+      if (changed){ // 안 한 일만 새 날짜로 다시 만들기
+        const done = S.tasks.filter(k => k.pid === old.id && k.done);
+        const hadPrep = S.tasks.some(k => k.pid === old.id && k.type === 'prep' && k.date < old.date);
+        S.tasks = S.tasks.filter(k => k.pid !== old.id || k.done);
+        S.tasks.push(...genTasks(old, hadPrep).filter(n => !done.some(k => k.title === n.title && k.date === n.date)));
+      }
+    }
+    closeSheet(); commit();
+  },
+  delPlant: () => {
+    if (!confirm('이 작물과 연결된 할 일을 모두 지울까요?')) return;
+    S.plantings = S.plantings.filter(p => p.id !== draft.id);
+    S.tasks = S.tasks.filter(k => k.pid !== draft.id);
+    closeSheet(); commit();
+  },
+  saveBeds: () => {
+    document.querySelectorAll('[data-bed]').forEach(i => { const b = S.beds[i.dataset.bed];
+      b[i.dataset.k] = i.dataset.k === 'zones' ? Math.max(1, Math.min(20, +i.value||1)) : i.value.trim() || b.name; });
+    commit();
+  },
+  saveSync: () => {
+    SY = {owner:$('#sy-owner').value.trim(), repo:$('#sy-repo').value.trim(), path:$('#sy-path').value.trim()||'data.json', token:$('#sy-token').value.trim()};
+    localStorage.setItem(LSS, JSON.stringify(SY)); sha = null; sync();
+  },
+  export: () => {
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([JSON.stringify(S,null,1)], {type:'application/json'}));
+    a.download = `텃밭-${today()}.json`; a.click();
+  },
+};
+document.addEventListener('click', e => {
+  const el = e.target.closest('[data-act]'); if (!el) return;
+  e.stopPropagation(); A[el.dataset.act]?.(el.dataset, el);
+});
+document.addEventListener('change', e => {
+  const id = e.target.id;
+  if (id === 'p-crop'){ readDraft(); $('#p-custom').hidden = draft.crop !== 'custom';
+    if (draft.crop !== 'custom'){ draft.date = defaultDate(draft.crop); $('#p-date').value = draft.date; } drawPlantExtras(); }
+  else if (['p-date','p-days','p-fam','p-prep'].includes(id)){ readDraft(); drawPlantExtras(); }
+  else if (id === 'shift'){ S.shift = +e.target.value; commit(); }
+  else if (id === 'imp'){
+    const f = e.target.files[0]; if (!f) return;
+    f.text().then(t => { const d = JSON.parse(t); if (!d.beds || !confirm('지금 데이터를 이 파일로 바꿀까요?')) return; S = d; commit(); })
+      .catch(() => alert('파일을 읽지 못했어요'));
+  }
+});
+
+render(); sync();
+if ('serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('sw.js');
+</script>
+</body>
+</html>
