@@ -538,7 +538,9 @@ const fmtA = a => a < 1 ? a.toFixed(2) : a.toFixed(1);
 // 작물이 그 구역에서 쓰는 넓이 (예전 기록은 구역 전체)
 const useOf = (p,z) => p.use ? (p.use[z]||0) : (p.zones.includes(z) ? zoneCap() : 0);
 const qtyOf = p => p.qty ?? Math.round(p.zones.length * zoneCap() / areaOf(p.crop));
-const defQty = k => Math.max(1, Math.round(zoneCap() * .5 / areaOf(k)));   // 기본: 반 구역 분량
+// 취미 텃밭에서 한 번에 심는 적당한 양 (자동으로 정할 때만 적용)
+const homeMax = k => { const a = areaOf(k); return a >= .15 ? 20 : a >= .06 ? 30 : a >= .02 ? 40 : 60; };
+const defQty = k => Math.max(1, Math.min(homeMax(k), Math.round(zoneCap() * .5 / areaOf(k))));   // 기본: 반 구역 분량, 상한 있음
 // a~b 동안 그 구역에서 가장 빠듯할 때 남는 넓이
 function freeOver(z, a, b, list=S.plantings, ex=null){
   const cap = zoneCap(), ps = list.filter(q => q.id !== ex && useOf(q,z) > 0 && q.date <= b && endOf(q) >= a);
@@ -869,7 +871,7 @@ const COMP = [
 ];
 const compOf = (a,b) => { for (const [x,y,sc,why] of COMP) if (sc && ((x.includes(a)&&y.includes(b)) || (x.includes(b)&&y.includes(a)))) return {sc, why}; return null; };
 const DEFAULT_WISH = [['pepper',20],['tomato',4],['basil',4],['eggplant',4],['cucumber',4],['leek',30],['potato',20],['kidneybean',20],
-  ['lettuce',12],['cabbage',12],['radish',15],['garlic',60],['carrot',60],['corn',12]].map(([k,qty]) => ({k, wi:-1, qty}));
+  ['lettuce',12],['cabbage',12],['radish',15],['garlic',60],['carrot',40],['corn',12]].map(([k,qty]) => ({k, wi:-1, qty}));
 const seasonName = m => m<=5 ? '봄' : m<=7 ? '여름' : m<=9 ? '가을' : '늦가을';
 const wishLabel = w => { const c = CROPS[w.k]; return `${c.e} ${c.n}`; };
 const wishSeason = w => { const c = CROPS[w.k]; if (c.y) return `${c.yrs}시즌`; if (c.w.length < 2) return `${c.w[0][0]}/${c.w[0][1]}`;
@@ -984,10 +986,10 @@ function makePlan(){
   for (const k of PERENNIAL_DEFAULT){ if (need <= 0) break;
     if (list.some(q => q.crop === k && endOf(q) >= y0)) continue;
     const date = dateOf(k,0), room = Math.max(0, ...fixed.map(z => freeOver(z, addD(date,-10), endOf({crop:k, date, years:CROPS[k].yrs}), list)));
-    if (room >= cap * .4 && place(k, date, Math.floor(Math.min(room, cap * .5) / areaOf(k)), fixed, '자동 채움', true)) need--; } // 반 구역씩
+    if (room >= cap * .4 && place(k, date, Math.min(homeMax(k), Math.floor(Math.min(room, cap * .5) / areaOf(k))), fixed, '자동 채움', true)) need--; } // 반 구역씩, 상한 있음
   // 3) 상반기·하반기에 넓이가 1/4 넘게 남은 구역 채우기 (고정 구역은 연작에 강한 작물, 지주 구역은 덩굴 작물 우선)
   const HALVES = [{a:`${year}-04-15`, b:`${year}-06-15`, ms:[3,4,5,6]}, {a:`${year}-08-20`, b:`${year}-10-31`, ms:[7,8,9,10]}];
-  for (const H of HALVES) for (const z of zones) for (let rep=0; rep<3; rep++){
+  for (const H of HALVES) for (const z of zones) for (let rep=0; rep<5; rep++){
     const room = freeOver(z, H.a, H.b, list);
     if (room < cap * .25) break;
     let best = null;
@@ -1000,7 +1002,7 @@ function makePlan(){
         const r = score(k, date, end, z, [], true, room); if (!r) return;
         const fill = Math.min(r.free, room, cap * .5);                     // 채우는 작물은 한 번에 반 구역까지
         if (fill < cap * .15) return;
-        const q = Math.floor(fill / a + 1e-6); if (q < 1) return;
+        const q = Math.min(homeMax(k), Math.floor(fill / a + 1e-6)); if (q < 1 || q * a < cap * .1) return;
         const sc = r.sc - cnt(k) * 2 - (a < .02 ? 1.5 : 0) + (TR.includes(z) && CLIMB.has(k) ? 3 : 0);
         if (!best || sc > best.sc) best = {k, date, q, sc}; });
     }
