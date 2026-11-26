@@ -690,7 +690,8 @@ function vTodo(){
 function vMap(){
   const y0 = `${year}-01-01`, y1 = `${year}-12-31`, t = today();
   let h = `<div class="ynav"><button data-act="year" data-d="-1">‹</button><b>${year}년</b><button data-act="year" data-d="1">›</button></div>
-    <div class="row" style="margin:-4px 0 12px;justify-content:center"><button class="btn pri sm" data-act="planOpen">✨ ${year}년 자동 배치</button></div>`;
+    <div class="row" style="margin:-4px 0 12px;justify-content:center"><button class="btn pri sm" data-act="planOpen">✨ ${year}년 자동 배치</button>
+      <button class="btn sm del" data-act="clearAsk">🗑 ${year}년 전부 삭제</button></div>`;
   h += `<div class="beds" style="grid-template-columns:repeat(${S.beds.length},1fr)">`;
   S.beds.forEach((b,bi) => {
     h += `<div class="bed"><h3>${esc(b.name)}</h3>`;
@@ -1120,6 +1121,25 @@ const A = {
   toRec: d => { recZone = d.z; closeSheet(); view = 'rec'; render(); scrollTo(0,0); },
   recZ: d => { recZone = d.z; render(); },
   planOpen: () => planSheet(),
+  // 그해에 심은 작물만 지우기 (전년도부터 이어지는 작물은 남김)
+  clearAsk: () => {
+    const ps = S.plantings.filter(p => p.date.slice(0,4) == year).sort((a,b) => a.date.localeCompare(b.date));
+    const keep = S.plantings.filter(p => p.date.slice(0,4) < year && endOf(p) >= `${year}-01-01`);
+    if (!ps.length) return openSheet(`<h3>${year}년 배치 삭제</h3><div class="legend">${year}년에 심은 작물이 없어요.</div>
+      <div class="acts"><button class="btn" data-act="close">닫기</button></div>`);
+    const nt = S.tasks.filter(k => ps.some(p => p.id === k.pid)).length;
+    openSheet(`<h3>🗑 ${year}년 배치를 전부 지울까요?</h3>
+      <div class="wbox">작물 ${ps.length}건과 연결된 할 일 ${nt}개가 지워져요. 되돌릴 수 없어요.</div>
+      <h2>지울 작물</h2><div class="card" style="font-size:14px">${ps.map(p => `<div>${plantName(p)} ${qtyOf(p)}포기 <small style="color:var(--sub)">${md(p.date)} · ${p.zones.map(zLabel).join(', ')}</small></div>`).join('')}</div>
+      ${keep.length ? `<div class="legend">전년도부터 이어지는 작물은 남겨요: ${keep.map(plantName).join(', ')}</div>` : ''}
+      <div class="acts"><button class="btn" data-act="close">취소</button><button class="btn pri" style="background:var(--warn);border-color:var(--warn)" data-act="clearDo">네, 전부 삭제</button></div>`);
+  },
+  clearDo: () => {
+    const ids = new Set(S.plantings.filter(p => p.date.slice(0,4) == year).map(p => p.id));
+    S.plantings = S.plantings.filter(p => !ids.has(p.id));
+    S.tasks = S.tasks.filter(k => !ids.has(k.pid));
+    closeSheet(); commit();
+  },
   fixN: d => { S.planFixed = Math.max(0, Math.min(8, (S.planFixed ?? 4) + +d.d)); commit(); planSheet(); },
   wishDel: d => { S.wish.splice(d.i,1); commit(); planSheet(); },
   wishS: d => { const w = S.wish[d.i], L = CROPS[w.k].w.length; w.wi = w.wi + 1 >= L ? -1 : w.wi + 1; commit(); planSheet(); },
