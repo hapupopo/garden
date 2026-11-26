@@ -68,6 +68,12 @@ h2:first-child{margin-top:4px}
 .chip.now{outline:2px solid var(--green)}
 .chip small{display:block;font-size:11px;color:var(--sub)}
 .legend{font-size:12px;color:var(--sub);margin-top:10px}
+.recs{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.rec{border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:10px;padding:8px 9px;text-align:left;font:inherit;font-size:14px;line-height:1.35}
+.rec small{display:block;font-size:11px;color:var(--sub)}
+.rec.star{border-color:var(--green);background:var(--green2)}
+.rec.star em{font-style:normal;font-size:11px;color:var(--green);display:block}
+.rec.bad{opacity:.75}.rec.bad em{font-style:normal;font-size:11px;color:var(--warn);display:block}
 .cal{display:grid;grid-template-columns:repeat(7,1fr);gap:3px}
 .cal .h{text-align:center;font-size:11px;color:var(--sub);padding:2px 0}
 .cal button{aspect-ratio:1/1.05;border:1px solid var(--line);background:var(--card);border-radius:8px;padding:3px;font:inherit;font-size:13px;color:var(--ink);display:flex;flex-direction:column;align-items:center;gap:3px}
@@ -111,6 +117,7 @@ body.sh #bk{display:block}body.sh #sheet{transform:none}
   <button data-act="view" data-v="todo"><b>✓</b>할 일</button>
   <button data-act="view" data-v="map"><b>▦</b>배치도</button>
   <button data-act="view" data-v="cal"><b>▤</b>달력</button>
+  <button data-act="view" data-v="rec"><b>★</b>추천</button>
   <button data-act="view" data-v="crops"><b>❀</b>작물</button>
   <button data-act="view" data-v="set"><b>⚙</b>설정</button>
 </nav>
@@ -590,7 +597,7 @@ document.addEventListener('visibilitychange', () => { if (document.visibilitySta
 
 // ───────── 화면 ─────────
 const now = new Date();
-let view = 'todo', year = now.getMonth() >= 10 ? now.getFullYear()+1 : now.getFullYear();
+let view = 'todo', recZone = '0-0', year = now.getMonth() >= 10 ? now.getFullYear()+1 : now.getFullYear();
 let calM = ds(new Date(now.getFullYear(), now.getMonth(), 1)), calSel = today();
 
 function taskRow(k){
@@ -663,6 +670,45 @@ function vCal(){
   return h;
 }
 
+// 앞 작물 과 → 다음에 좋은 과
+const SUCC = {가지과:['콩과','배추과','백합과','국화과'], 박과:['콩과','배추과','백합과','국화과'], 배추과:['콩과','박과','백합과','가지과'],
+  콩과:['가지과','박과','배추과','벼과'], 백합과:['콩과','박과','가지과'], 국화과:['가지과','박과','콩과'], 벼과:['콩과','배추과'],
+  비름과:['콩과','박과','가지과'], 산형과:['콩과','배추과'], 메꽃과:['콩과','배추과'], 꿀풀과:['콩과','배추과']};
+const why = (pf,f) => f==='콩과' && HEAVY.includes(pf) ? '땅심 회복' : pf==='콩과' ? '콩이 남긴 질소 활용' : '궁합 좋음';
+function vRec(){
+  const z = recZone, sh = +S.shift||0;
+  const zs = S.plantings.filter(p => p.zones.includes(z)).sort((a,b) => a.date.localeCompare(b.date));
+  const recent = zs.filter(p => endOf(p) >= addD(`${year}-01-01`,-730) && p.date < `${year}-01-01`);
+  const seasons = {봄:[],여름:[],가을:[],'월동':[],'다년생 (한 자리 여러 해)':[]}, bad = [];
+  for (const [k,c] of Object.entries(CROPS)) for (const [m,d] of c.w){
+    const date = snap(addD(`${year}-${pad(m)}-${pad(d)}`, sh));
+    const p = {id:'tmp', crop:k, date, zones:[z], years:c.yrs}, end = endOf(p);
+    const w = checkZones(c.f, [z], date, end, 'tmp');
+    if (w.some(x => x.includes('자라는 중'))) continue; // 자리가 없음
+    const prev = zs.filter(q => endOf(q) <= date).pop();
+    const item = {k, c, date, end, prev};
+    if (w.length){ item.w = w[0].replace(/^[\d-]+: /,''); bad.push(item); continue; }
+    if (prev && (SUCC[cropOf(prev).f]||[]).includes(c.f)) item.star = `★ ${cropOf(prev).n} 다음 · ${why(cropOf(prev).f, c.f)}`;
+    const sea = c.y ? '다년생 (한 자리 여러 해)' : m<=5 ? '봄' : m<=7 ? '여름' : m<=9 ? '가을' : '월동';
+    seasons[sea].push(item);
+  }
+  const card = (it, cls) => `<button class="rec ${cls||''}" data-act="recPick" data-k="${it.k}" data-d="${it.date}">${it.c.e} ${esc(it.c.n)}
+    <small>${md(it.date)} 심기 → ${it.end.slice(0,4)!=year?it.end.slice(2,4)+'.':''}${md(it.end)}</small>${it.star?`<em>${it.star}</em>`:''}${it.w?`<em>${esc(it.w)}</em>`:''}</button>`;
+  let h = `<div class="ynav"><button data-act="year" data-d="-1">‹</button><b>${year}년</b><button data-act="year" data-d="1">›</button></div>
+    <div class="card"><div class="zsel">${S.beds.map((b,bi) => `<div class="bn">${esc(b.name)}</div>` +
+      Array.from({length:b.zones}, (_,zi) => `<button data-act="recZ" data-z="${bi}-${zi}" class="${z===bi+'-'+zi?'on':''}">${zi+1}</button>`).join('')).join('')}</div>
+    <div class="legend">${zLong(z)} · 최근 2년: ${recent.length ? recent.map(p => `${plantName(p)}(${cropOf(p).f})`).join(', ') : '기록 없음'}
+    ${zs.filter(p => p.date.slice(0,4)==year).length ? `<br>${year}년 심은 것: ${zs.filter(p => p.date.slice(0,4)==year).map(plantName).join(', ')}` : ''}</div></div>
+    <div class="legend" style="margin:0 0 4px">연작 걱정 없고 자리가 비는 작물만 보여요. ★는 앞 작물과 궁합이 좋은 작물. 누르면 바로 심기.</div>`;
+  for (const [sea, items] of Object.entries(seasons)){
+    if (!items.length) continue;
+    items.sort((a,b) => (!!b.star - !!a.star) || a.date.localeCompare(b.date));
+    h += `<h2>${sea} · ${items.length}</h2><div class="recs">${items.map(it => card(it, it.star?'star':'')).join('')}</div>`;
+  }
+  if (bad.length) h += `<h2 class="late">피하는 게 좋아요 · ${bad.length}</h2><div class="recs">${bad.map(it => card(it,'bad')).join('')}</div>`;
+  return h;
+}
+
 function vCrops(){
   let h = `<div class="card tip"><b>밭 준비 순서</b> (심기 전 일수)<br>
     -24일 석회고토 → -17일 완숙퇴비·밑거름 + <b>토양살충제 + 토양살균제</b> 섞어 갈기 → -8일 미생물제 → -6일 두둑·멀칭 → 정식<br>
@@ -714,7 +760,7 @@ function vSet(){
 
 function render(){
   document.querySelectorAll('#nav button').forEach(b => b.classList.toggle('on', b.dataset.v === view));
-  $('#main').innerHTML = {todo:vTodo, map:vMap, cal:vCal, crops:vCrops, set:vSet}[view]();
+  $('#main').innerHTML = {todo:vTodo, map:vMap, cal:vCal, crops:vCrops, rec:vRec, set:vSet}[view]();
 }
 
 // ───────── 시트 (팝업) ─────────
@@ -725,10 +771,9 @@ function zoneSheet(z){
   const ps = S.plantings.filter(p => p.zones.includes(z)).sort((a,b) => b.date.localeCompare(a.date));
   const since = addD(`${year}-01-01`, -730);
   const used = [...new Set(ps.filter(p => endOf(p) >= since && p.date < `${year}-01-01`).map(p => cropOf(p).f))];
-  const rec = ['가지과','박과','배추과','콩과','백합과','국화과','산형과'].filter(f => !used.includes(f));
   openSheet(`<h3>${zLong(z)}</h3>
     ${used.length ? `<div class="wbox">최근 2년 사용: ${used.join(', ')}</div>` : ''}
-    <div class="okbox">${year}년 추천: ${rec.join(', ')}</div>
+    <div class="row" style="margin-top:10px"><button class="btn sm" data-act="toRec" data-z="${z}">★ ${year}년 이 구역 추천 작물 보기</button></div>
     <h2>심은 기록</h2>
     ${ps.length ? `<div class="hist">${ps.map(p => `<b>${p.date.slice(0,4)}</b><span data-act="editPlant" data-id="${p.id}" style="text-decoration:underline">${plantName(p)} (${cropOf(p).f}) ${md(p.date)}~${md(endOf(p))}</span>`).join('')}</div>` : '<div class="legend">기록 없음</div>'}
     <div class="acts"><button class="btn" data-act="close">닫기</button><button class="btn pri" data-act="newPlant" data-z="${z}">+ 이 구역에 심기</button></div>`);
@@ -808,6 +853,9 @@ const A = {
   },
   delTask: d => { if (!confirm('이 할 일을 지울까요?')) return; S.tasks = S.tasks.filter(x => x.id !== d.id); closeSheet(); commit(); },
   zone: d => zoneSheet(d.z),
+  toRec: d => { recZone = d.z; closeSheet(); view = 'rec'; render(); scrollTo(0,0); },
+  recZ: d => { recZone = d.z; render(); },
+  recPick: d => plantSheet({id:uid(), crop:d.k, date:d.d, zones:[recZone], years:CROPS[d.k].yrs, memo:''}, true),
   newPlant: d => plantSheet({id:uid(), crop:'pepper', date:defaultDate('pepper'), zones:[d.z], memo:''}, true),
   editPlant: d => plantSheet(S.plantings.find(p => p.id === d.id), false),
   zt: d => { readDraft(); const i = draft.zones.indexOf(d.z); i<0 ? draft.zones.push(d.z) : draft.zones.splice(i,1); drawPlantExtras(); },
