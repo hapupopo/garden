@@ -714,7 +714,7 @@ function vMap(){
     }
     h += `</div>`;
   });
-  h += `</div><div class="legend">작물을 길게 눌러(마우스는 그냥) 끌면 다른 구역으로 옮겨요. 구역 하나 ≈ ${fmtA(zoneCap())}㎡. 막대·% = 구역에서 차지하는 넓이, 구역 옆 % = 그해 가장 빠듯할 때 사용률. 넓이가 남으면 여러 작물을 한 구역에 같이 심을 수 있어요. 초록 테두리 = 지금 자라는 중.</div>`;
+  h += `</div><div class="legend">작물을 꾹 눌러 끌면 다른 구역으로 옮기고, 꾹 눌렀다 떼면 포기 수 조정·삭제. 구역 하나 ≈ ${fmtA(zoneCap())}㎡. 막대·% = 구역에서 차지하는 넓이, 구역 옆 % = 그해 가장 빠듯할 때 사용률. 넓이가 남으면 여러 작물을 한 구역에 같이 심을 수 있어요. 초록 테두리 = 지금 자라는 중.</div>`;
   return h;
 }
 
@@ -1241,6 +1241,7 @@ function dragStart(){
 function dragMove(x, y){
   drag.x = x; drag.y = y;
   if (!drag.on) return;
+  if (Math.hypot(x - drag.sx, y - drag.sy) > 12) drag.moved = true;
   drag.ghost.style.left = x + 'px'; drag.ghost.style.top = y + 'px';
   const zone = document.elementFromPoint(x, y)?.closest('.zone');
   document.querySelectorAll('.zone.drop').forEach(e => e !== zone && e.classList.remove('drop'));
@@ -1255,6 +1256,7 @@ function dragEnd(){
   document.body.classList.remove('dragging'); d.ghost?.remove();
   if (!d.on) return;
   eatClick = true; setTimeout(() => eatClick = false, 400);
+  if (!d.moved) return chipSheet(d.pid, d.from);   // 꾹 눌렀다 그냥 떼면 편집
   const to = document.elementFromPoint(d.x, d.y)?.closest('.zone')?.dataset.z;
   if (to && to !== d.from) movePlant(d.pid, d.from, to);
 }
@@ -1270,6 +1272,52 @@ function movePlant(pid, from, to){
   Object.assign(p, {use, zones: moved.zones});
   commit();
 }
+// 꾹 눌러 여는 편집 창: 이 구역의 포기 수 조정·빼기·삭제
+function chipSheet(pid, z){
+  const p = S.plantings.find(x => x.id === pid); if (!p) return;
+  const a = areaOf(p.crop), n = Math.round(useOf(p,z) / a);
+  openSheet(`<h3>${plantName(p)} · ${zLong(z)}</h3>
+    <div class="legend" style="margin-top:0">${p.date.replace(/-/g,'.')} 심기 → ${endOf(p).replace(/-/g,'.')} · 한 포기 ${a}㎡${p.zones.length > 1 ? ` · 전체 ${qtyOf(p)}포기 (${p.zones.map(zLabel).join(', ')})` : ''}</div>
+    <label>이 구역 포기 수</label>
+    <div class="row"><button class="btn" data-act="cqN" data-d="-1">−</button>
+      <input id="cq" type="number" min="1" value="${n}" style="flex:1;text-align:center;font-size:20px;font-weight:700">
+      <button class="btn" data-act="cqN" data-d="1">＋</button></div>
+    <div id="cq-info"></div>
+    <div class="row" style="margin-top:14px">
+      ${p.zones.length > 1 ? `<button class="btn sm" data-act="cqOut">이 구역에서만 빼기</button>` : ''}
+      <button class="btn sm del" data-act="cqDel">작물 전체 삭제</button>
+      <button class="btn sm" data-act="cqFull">상세 수정</button></div>
+    <div class="acts"><button class="btn" data-act="close">닫기</button><button class="btn pri" data-act="cqSave">저장</button></div>`);
+  chipCtx = {pid, z}; drawChipInfo();
+}
+let chipCtx = null;
+function drawChipInfo(){
+  const p = S.plantings.find(x => x.id === chipCtx.pid), z = chipCtx.z, a = areaOf(p.crop);
+  const n = Math.max(1, +$('#cq').value || 1), need = n * a;
+  const others = freeOver(z, p.date, endOf(p), S.plantings, p.id);   // 이 작물을 뺀 빈 넓이
+  $('#cq-info').innerHTML = `<div class="legend">${fmtA(need)}㎡ = 구역의 ${Math.round(need/zoneCap()*100)}% · 이 구역에 최대 ${Math.floor(others/a + 1e-6)}포기</div>`
+    + (need > others + .01 ? `<div class="wbox">⚠ 자리 부족 — 빈 곳 ${fmtA(others)}㎡, 필요 ${fmtA(need)}㎡</div>` : '');
+}
+function setZoneQty(p, z, n){
+  const use = p.use ? {...p.use} : Object.fromEntries(p.zones.map(y => [y, useOf(p,y)]));
+  if (n > 0) use[z] = +(n * areaOf(p.crop)).toFixed(3); else delete use[z];
+  p.use = use; p.zones = p.zones.filter(y => use[y] > 0);
+  p.qty = Math.round(Object.values(use).reduce((s,v) => s + v, 0) / areaOf(p.crop));
+}
+const delPlanting = id => { S.plantings = S.plantings.filter(p => p.id !== id); S.tasks = S.tasks.filter(k => k.pid !== id); };
+Object.assign(A, {
+  cqN: d => { const i = $('#cq'); i.value = Math.max(1, (+i.value || 1) + +d.d); drawChipInfo(); },
+  cqSave: () => { const p = S.plantings.find(x => x.id === chipCtx.pid); setZoneQty(p, chipCtx.z, Math.max(1, +$('#cq').value || 1)); closeSheet(); commit(); },
+  cqOut: () => { const p = S.plantings.find(x => x.id === chipCtx.pid);
+    if (!confirm(`${zLabel(chipCtx.z)}에서 ${plantName(p)}을(를) 뺄까요? (다른 구역 몫은 남아요)`)) return;
+    setZoneQty(p, chipCtx.z, 0); closeSheet(); commit(); },
+  cqDel: () => { const p = S.plantings.find(x => x.id === chipCtx.pid);
+    if (!confirm(`${plantName(p)} ${qtyOf(p)}포기와 연결된 할 일을 모두 지울까요? 되돌릴 수 없어요.`)) return;
+    delPlanting(p.id); closeSheet(); commit(); },
+  cqFull: () => plantSheet(S.plantings.find(x => x.id === chipCtx.pid), false),
+});
+document.addEventListener('input', e => { if (e.target.id === 'cq') drawChipInfo(); });
+
 const chipAt = e => view === 'map' && e.target.closest?.('.chip[data-pid]');
 document.addEventListener('touchstart', e => { const c = chipAt(e); if (!c || e.touches.length > 1) return;
   const t = e.touches[0]; drag = {chip:c, pid:c.dataset.pid, from:c.dataset.z, x:t.clientX, y:t.clientY, sx:t.clientX, sy:t.clientY, on:false};
@@ -1280,13 +1328,14 @@ document.addEventListener('touchmove', e => { if (!drag) return; const t = e.tou
 document.addEventListener('touchend', dragEnd);
 document.addEventListener('touchcancel', () => { if (drag && !drag.on){ clearTimeout(drag.t); drag = null; } else dragEnd(); });
 document.addEventListener('mousedown', e => { const c = chipAt(e); if (!c || e.button) return; e.preventDefault();
-  drag = {chip:c, pid:c.dataset.pid, from:c.dataset.z, x:e.clientX, y:e.clientY, sx:e.clientX, sy:e.clientY, on:false, mouse:true}; });
+  drag = {chip:c, pid:c.dataset.pid, from:c.dataset.z, x:e.clientX, y:e.clientY, sx:e.clientX, sy:e.clientY, on:false, mouse:true};
+  drag.t = setTimeout(dragStart, 450); });
 document.addEventListener('mousemove', e => { if (!drag?.mouse) return;
-  if (!drag.on && Math.hypot(e.clientX-drag.sx, e.clientY-drag.sy) > 6){ drag.x = e.clientX; drag.y = e.clientY; dragStart(); }
+  if (!drag.on && Math.hypot(e.clientX-drag.sx, e.clientY-drag.sy) > 6){ clearTimeout(drag.t); drag.x = e.clientX; drag.y = e.clientY; dragStart(); }
   dragMove(e.clientX, e.clientY); });
-document.addEventListener('mouseup', () => { if (drag?.mouse) dragEnd(); });
+document.addEventListener('mouseup', () => { if (drag?.mouse){ if (!drag.on){ clearTimeout(drag.t); drag = null; } else dragEnd(); } });
 document.addEventListener('contextmenu', e => { if (chipAt(e)) e.preventDefault(); });
-document.addEventListener('click', e => { if (eatClick){ e.stopPropagation(); e.preventDefault(); eatClick = false; } }, true);
+document.addEventListener('click', e => { if (eatClick && e.target.closest?.('#main .zone')){ e.stopPropagation(); e.preventDefault(); eatClick = false; } }, true); // 끌기·꾹 누르기 뒤 구역 창이 열리지 않게
 
 render(); sync();
 if ('serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('sw.js');
