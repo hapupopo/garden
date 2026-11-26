@@ -458,6 +458,11 @@ const CROPS = {
 const GROUPS = ['열매채소','잎채소·샐러드','뿌리채소','콩·곡류','양념·향신','월동 작물','산나물·다년생'];
 const FAMILIES = ['가지과','박과','배추과','국화과','비름과','백합과','산형과','콩과','벼과','메꽃과','초롱꽃과','장미과','꿀풀과','아욱과','생강과','천남성과','마과','참깨과','돌나물과','기타'];
 const HEAVY = ['가지과','박과']; // 3~4년 간격 권장
+// 한 구역에 여러 가지 같이 심어도 되는 작은 작물
+const SMALL = new Set(['lettuce','romaine','butterhead','frillice','icebergl','chicory','endive','ssukgat','rucola','mustard','bokchoy','tatsoi',
+  'ssamchu','chard','mallow','spinach','springspinach','wspinach','wlettuce','yeolmu','eolgari','radish20','beet','scallion','coriander','parsley',
+  'basil','celery','kale','godeulppaegi','gat','bomdong','kohlrabi','altari']);
+const isSmall = p => SMALL.has(p.crop);
 const TYPES = {prep:'밭준비',fert:'거름',prune:'순·솎기',pest:'방제',water:'물',harvest:'수확',care:'관리'};
 const REGIONS = {0:'중부 (서울·경기)',[-10]:'남부',7:'강원 산간'};
 const TIPS = {
@@ -524,13 +529,18 @@ function genTasks(p, prep){
     if (!out.some(k => k.date === date && k.title === title)) out.push({id:uid(), pid:p.id, date, title, type, done:false}); };
   const push = (o,title,type) => at(addD(p.date,o), title, type);
   const end = endOf(p);
+  // 같은 자리 앞 작물이 25일 안에 끝나면 밭 준비를 그 사이로 압축
+  const prevEnd = S.plantings.filter(q => q.id !== p.id && q.zones.some(z => p.zones.includes(z)) && !(isSmall(q) && isSmall(p))
+    && endOf(q) < p.date && endOf(q) > addD(p.date,-25)).map(endOf).sort().pop();
+  const f = prevEnd ? Math.max(0, (gap(prevEnd, p.date) - 1) / 24) : 1;
+  const pp = (o,title) => push(Math.min(-1, Math.round(o*f)), title + (f < 1 && o === -24 ? ' (앞 작물 정리 직후라 준비 일정 압축)' : ''), 'prep');
   if (prep){
-    if (c.lime) push(-24,'석회고토 살포 (㎡당 100~150g) · 흙 갈기','prep');
-    push(-17,'완숙퇴비(㎡당 2~3kg) · 밑거름 넣고 갈기','prep');
-    push(-17,'토양살충제(입제) 뿌리고 섞기 — 굼벵이·거세미·선충 (이 작물에 등록된 약제, 라벨 사용량)','prep');
-    push(-17,'토양살균제(입제) 뿌리고 섞기 — 뿌리썩음·시들음병 (이 작물에 등록된 약제, 라벨 사용량)','prep');
-    push(-8,'토양 미생물제 살포 (고초균·EM, 살균제 뒤 1주 이상 지나서)','prep');
-    push(-6, c.mulch ? '두둑 만들기 · 검정 멀칭' : '두둑 만들기','prep');
+    if (c.lime) pp(-24,'석회고토 살포 (㎡당 100~150g) · 흙 갈기');
+    pp(-17,'완숙퇴비(㎡당 2~3kg) · 밑거름 넣고 갈기');
+    pp(-17,'토양살충제(입제) 뿌리고 섞기 — 굼벵이·거세미·선충 (이 작물에 등록된 약제, 라벨 사용량)');
+    pp(-17,'토양살균제(입제) 뿌리고 섞기 — 뿌리썩음·시들음병 (이 작물에 등록된 약제, 라벨 사용량)');
+    pp(-8,'토양 미생물제 살포 (고초균·EM, 살균제 뒤 1주 이상 지나서)');
+    pp(-6, c.mulch ? '두둑 만들기 · 검정 멀칭' : '두둑 만들기');
   }
   for (const [o,t,ty,ev,until] of c.s){
     if (ev) for (let k=o; k<=until; k+=ev) push(k,t,ty); else push(o,t,ty);
@@ -542,13 +552,13 @@ function genTasks(p, prep){
 }
 
 // 연작·겹침 경고
-function checkZones(family, zones, date, end, exclude){
+function checkZones(family, zones, date, end, exclude, small=false, list=S.plantings){
   const warn = [];
   for (const z of zones){
-    for (const p of S.plantings){
+    for (const p of list){
       if (p.id === exclude || !p.zones.includes(z)) continue;
       const c = cropOf(p), pe = endOf(p);
-      if (p.date <= end && pe >= date){ warn.push(`${zLabel(z)}: ${c.n}이(가) ${md(pe)}까지 자라는 중`); continue; }
+      if (p.date <= end && pe >= date){ if (small && isSmall(p)) continue; warn.push(`${zLabel(z)}: ${c.n}이(가) ${md(pe)}까지 자라는 중`); continue; }
       if (c.f !== family || family === '기타' || pe > date) continue;
       const g = gap(pe, date);
       if (g < 365) warn.push(`${zLabel(z)}: ${p.date.slice(0,4)}년 ${c.n}(${family}) 바로 다음 — 연작 피해 우려`);
@@ -632,7 +642,8 @@ function vTodo(){
 
 function vMap(){
   const y0 = `${year}-01-01`, y1 = `${year}-12-31`, t = today();
-  let h = `<div class="ynav"><button data-act="year" data-d="-1">‹</button><b>${year}년</b><button data-act="year" data-d="1">›</button></div>`;
+  let h = `<div class="ynav"><button data-act="year" data-d="-1">‹</button><b>${year}년</b><button data-act="year" data-d="1">›</button></div>
+    <div class="row" style="margin:-4px 0 12px;justify-content:center"><button class="btn pri sm" data-act="planOpen">✨ ${year}년 자동 배치</button></div>`;
   h += `<div class="beds" style="grid-template-columns:repeat(${S.beds.length},1fr)">`;
   S.beds.forEach((b,bi) => {
     h += `<div class="bed"><h3>${esc(b.name)}</h3>`;
@@ -640,13 +651,19 @@ function vMap(){
       const z = `${bi}-${zi}`;
       const ps = S.plantings.filter(p => p.zones.includes(z) && p.date <= y1 && endOf(p) >= y0).sort((a,b) => a.date.localeCompare(b.date));
       h += `<button class="zone" data-act="zone" data-z="${z}"><div class="zl"><span>${zi+1}구역</span>${zoneWarn(z,year)?'<span class="warn">⚠ 연작</span>':''}</div>`;
-      h += ps.map(p => { const e = endOf(p); const cls = e < t ? 'past' : (p.date <= t ? 'now' : '');
-        return `<span class="chip ${cls}">${plantName(p)}<small>${p.date.slice(0,4)!=year?p.date.slice(2,4)+'.':''}${md(p.date)}~${e.slice(0,4)!=year?e.slice(2,4)+'.':''}${md(e)}</small></span>`; }).join('');
+      // 같은 시기에 같이 심은 작은 작물은 한 칸으로 묶기
+      const groups = [];
+      for (const p of ps){ const g = groups[groups.length-1];
+        if (g && isSmall(p) && g.every(isSmall) && p.date <= g.end){ g.push(p); if (endOf(p) > g.end) g.end = endOf(p); }
+        else { const n = [p]; n.end = endOf(p); groups.push(n); } }
+      const yy = s => s.slice(0,4)!=year ? s.slice(2,4)+'.' : '';
+      h += groups.map(g => { const st = g[0].date, e = g.end; const cls = e < t ? 'past' : (st <= t ? 'now' : '');
+        return `<span class="chip ${cls}">${g.map(plantName).join(' · ')}${g.length>1?` <b style="font-size:11px;color:var(--green)">함께 ${g.length}</b>`:''}<small>${yy(st)}${md(st)}~${yy(e)}${md(e)}</small></span>`; }).join('');
       h += `</button>`;
     }
     h += `</div>`;
   });
-  h += `</div><div class="legend">구역을 누르면 심기·이력을 볼 수 있어요. 초록 테두리 = 지금 자라는 중.</div>`;
+  h += `</div><div class="legend">구역을 누르면 심기·이력을 볼 수 있어요. 초록 테두리 = 지금 자라는 중. 상추·쌈채소·허브 같은 작은 작물은 한 구역에 여러 가지 같이 심을 수 있어요.</div>`;
   return h;
 }
 
@@ -683,7 +700,7 @@ function vRec(){
   for (const [k,c] of Object.entries(CROPS)) for (const [m,d] of c.w){
     const date = snap(addD(`${year}-${pad(m)}-${pad(d)}`, sh));
     const p = {id:'tmp', crop:k, date, zones:[z], years:c.yrs}, end = endOf(p);
-    const w = checkZones(c.f, [z], date, end, 'tmp');
+    const w = checkZones(c.f, [z], date, end, 'tmp', SMALL.has(k));
     if (w.some(x => x.includes('자라는 중'))) continue; // 자리가 없음
     const prev = zs.filter(q => endOf(q) <= date).pop();
     const item = {k, c, date, end, prev};
@@ -779,6 +796,71 @@ function zoneSheet(z){
     <div class="acts"><button class="btn" data-act="close">닫기</button><button class="btn pri" data-act="newPlant" data-z="${z}">+ 이 구역에 심기</button></div>`);
 }
 
+// ───────── 자동 배치 ─────────
+const DEFAULT_WISH = [['pepper',0,2],['tomato',0,1],['eggplant',0,1],['cucumber',0,1],['potato',0,1],['lettuce',0,1],['romaine',0,1],
+  ['cabbage',0,2],['radish',0,1],['garlic',0,1]].map(([k,wi,n]) => ({k,wi,n}));
+const wishDate = w => { const [m,d] = CROPS[w.k].w[w.wi] || CROPS[w.k].w[0]; return snap(addD(`${year}-${pad(m)}-${pad(d)}`, +S.shift||0)); };
+const wishLabel = w => { const c = CROPS[w.k], [m,d] = c.w[w.wi] || c.w[0]; return `${c.e} ${c.n} <small style="color:var(--sub)">${m}/${d}</small>`; };
+let plan = null;
+function planSheet(){
+  if (!S.wish) S.wish = DEFAULT_WISH.map(w => ({...w}));
+  const opts = GROUPS.map(g => `<optgroup label="${g}">${Object.entries(CROPS).filter(([,c]) => c.g === g).flatMap(([k,c]) =>
+    c.w.map(([m,d],i) => `<option value="${k}|${i}">${c.e} ${c.n} (${m}/${d})</option>`)).join('')}</optgroup>`).join('');
+  const total = S.beds.reduce((a,b) => a + b.zones, 0);
+  openSheet(`<h3>✨ ${year}년 자동 배치</h3>
+    <div class="legend" style="margin-top:0">키울 작물과 구역 수를 정하면 연작·앞 작물 궁합·봄→가을 이어짓기를 따져 자리를 정해요. 이미 심어 둔 작물은 그대로 두고 빈 자리에만 넣어요. 밭은 ${total}구역.</div>
+    <div class="card" style="margin-top:10px">${S.wish.map((w,i) => `<div class="row" style="padding:4px 0">
+      <span style="flex:1">${wishLabel(w)}${SMALL.has(w.k)?' <small style="color:var(--green)">같이심기 가능</small>':''}</span>
+      <button class="btn sm" data-act="wishN" data-i="${i}" data-d="-1">−</button><b style="min-width:42px;text-align:center">${w.n}구역</b>
+      <button class="btn sm" data-act="wishN" data-i="${i}" data-d="1">＋</button></div>`).join('') || '<div class="legend">작물을 추가해 주세요</div>'}
+      <div class="row" style="margin-top:8px"><select id="wish-add" style="flex:1">${opts}</select><button class="btn sm" data-act="wishAdd">추가</button></div>
+    </div>
+    <div id="plan-out"></div>
+    <div class="acts"><button class="btn" data-act="close">닫기</button><button class="btn pri" data-act="planMake">배치 짜기</button></div>`);
+}
+function makePlan(){
+  const list = [...S.plantings], out = [], fail = [];
+  const zones = S.beds.flatMap((b,bi) => Array.from({length:b.zones}, (_,zi) => `${bi}-${zi}`));
+  const units = S.wish.filter(w => w.n > 0).map(w => ({w, c:CROPS[w.k], date:wishDate(w)}))
+    .sort((a,b) => (!!b.c.y - !!a.c.y) || a.date.localeCompare(b.date) || (SMALL.has(a.w.k) - SMALL.has(b.w.k)));
+  for (const {w, c, date} of units){
+    const small = SMALL.has(w.k);
+    const p = {id:uid(), crop:w.k, date, zones:[], years:c.yrs, memo:'자동 배치'}, end = endOf(p);
+    for (let i=0; i<w.n; i++){
+      let best = null;
+      for (const z of zones){
+        if (p.zones.includes(z)) continue;
+        const warn = checkZones(c.f, [z], date, end, null, small, list);
+        if (warn.some(x => x.includes('자라는 중'))) continue;
+        const inZ = list.filter(q => q.zones.includes(z));
+        if (inZ.some(q => endOf(q) <= date && endOf(q) > addD(date,-10) && !(small && isSmall(q)))) continue; // 밭 준비할 틈 없음
+        const prev = inZ.filter(q => endOf(q) <= date).sort((a,b) => endOf(a).localeCompare(endOf(b))).pop();
+        let sc = Math.random() * .5 - warn.length * 10;
+        if (prev && (SUCC[cropOf(prev).f]||[]).includes(c.f)) sc += 3;
+        if (prev && endOf(prev) >= `${year}-01-01`) sc += 1;                 // 같은 해 비는 자리 이어짓기
+        if (small && inZ.some(q => isSmall(q) && q.date <= end && endOf(q) >= date)) sc += 2; // 작은 작물끼리 모으기
+        const [bi,zi] = z.split('-').map(Number);
+        if (p.zones.some(y => { const [b2,z2] = y.split('-').map(Number); return b2===bi && Math.abs(z2-zi)===1; })) sc += 2;
+        if (!best || sc > best.sc) best = {z, sc, warn};
+      }
+      if (!best){ fail.push(`${c.n}: 자리 부족 (${w.n - i}구역 못 넣음)`); break; }
+      p.zones.push(best.z); if (best.warn.length) p.warn = best.warn[0];
+    }
+    if (p.zones.length){ list.push(p); out.push(p); }
+  }
+  return {out, fail};
+}
+function drawPlan(){
+  const byZ = {}; plan.out.forEach(p => p.zones.forEach(z => (byZ[z] ||= []).push(p)));
+  $('#plan-out').innerHTML = `<h2>배치 결과</h2><div class="card">${S.beds.map((b,bi) => `<div class="bn" style="font-size:12px;color:var(--sub);margin-top:4px">${esc(b.name)}</div>` +
+    Array.from({length:b.zones}, (_,zi) => { const ps = (byZ[`${bi}-${zi}`]||[]).sort((a,b) => a.date.localeCompare(b.date));
+      return `<div class="row" style="padding:3px 0;font-size:14px"><b style="width:44px">${zi+1}구역</b><span style="flex:1">${ps.length ? ps.map(p =>
+        `${plantName(p)} <small style="color:var(--sub)">${md(p.date)}</small>${p.warn?' <span class="late">⚠</span>':''}`).join(' → ') : '<small style="color:var(--sub)">추가 없음</small>'}</span></div>`; }).join('')).join('')}</div>
+    ${plan.fail.length ? `<div class="wbox">${plan.fail.map(esc).join('<br>')}</div>` : ''}
+    ${plan.out.some(p => p.warn) ? `<div class="wbox">⚠ 연작을 피할 자리가 없어 어쩔 수 없이 넣은 곳: ${plan.out.filter(p => p.warn).map(p => esc(p.warn)).join(' / ')}</div>` : ''}
+    <div class="row" style="margin-top:10px"><button class="btn" data-act="planMake">다시 짜기</button><button class="btn pri" style="flex:1" data-act="planApply">이대로 적용 (할 일 자동 생성)</button></div>`;
+}
+
 let draft = null;
 function plantSheet(p, isNew){
   draft = JSON.parse(JSON.stringify(p));
@@ -805,9 +887,10 @@ function drawPlantExtras(){
   $('#p-zones').innerHTML = S.beds.map((b,bi) => `<div class="bn">${esc(b.name)}</div>` +
     Array.from({length:b.zones}, (_,zi) => `<button data-act="zt" data-z="${bi}-${zi}" class="${draft.zones.includes(bi+'-'+zi)?'on':''}">${zi+1}</button>`).join('')).join('');
   const c = cropOf(draft);
-  const w = draft.zones.length ? checkZones(c.f, draft.zones, draft.date, endOf(draft), draft.id) : [];
+  const w = draft.zones.length ? checkZones(c.f, draft.zones, draft.date, endOf(draft), draft.id, isSmall(draft)) : [];
+  const mates = S.plantings.filter(p => p.id !== draft.id && isSmall(draft) && isSmall(p) && p.date <= endOf(draft) && endOf(p) >= draft.date && p.zones.some(z => draft.zones.includes(z)));
   const n = genTasks(draft, $('#p-prep')?.checked).length;
-  $('#p-warn').innerHTML = (w.length ? `<div class="wbox">⚠ ${w.map(esc).join('<br>⚠ ')}</div>` : (draft.zones.length ? '<div class="okbox">연작 문제 없음</div>' : '<div class="wbox">구역을 골라 주세요</div>'))
+  $('#p-warn').innerHTML = (w.length ? `<div class="wbox">⚠ ${w.map(esc).join('<br>⚠ ')}</div>` : (draft.zones.length ? `<div class="okbox">연작 문제 없음${mates.length?` · ${mates.map(plantName).join(', ')}와 같이 심기`:''}</div>` : '<div class="wbox">구역을 골라 주세요</div>'))
     + `<div class="legend">${draft.date.replace(/-/g,'.')} 심기 → ${endOf(draft).replace(/-/g,'.')} 무렵 정리 · 할 일 ${n}개 자동 생성</div>`;
 }
 function readDraft(){
@@ -855,6 +938,15 @@ const A = {
   zone: d => zoneSheet(d.z),
   toRec: d => { recZone = d.z; closeSheet(); view = 'rec'; render(); scrollTo(0,0); },
   recZ: d => { recZone = d.z; render(); },
+  planOpen: () => planSheet(),
+  wishN: d => { const w = S.wish[d.i]; w.n += +d.d; if (w.n < 0) S.wish.splice(d.i,1); commit(); planSheet(); },
+  wishAdd: () => { const [k,wi] = $('#wish-add').value.split('|'); S.wish.push({k, wi:+wi, n:1}); commit(); planSheet(); },
+  planMake: () => { plan = makePlan(); drawPlan(); $('#plan-out').scrollIntoView({behavior:'smooth'}); },
+  planApply: () => {
+    if (!plan || !plan.out.length) return;
+    plan.out.forEach(p => { delete p.warn; S.plantings.push(p); S.tasks.push(...genTasks(p, true)); });
+    plan = null; closeSheet(); view = 'map'; commit();
+  },
   recPick: d => plantSheet({id:uid(), crop:d.k, date:d.d, zones:[recZone], years:CROPS[d.k].yrs, memo:''}, true),
   newPlant: d => plantSheet({id:uid(), crop:'pepper', date:defaultDate('pepper'), zones:[d.z], memo:''}, true),
   editPlant: d => plantSheet(S.plantings.find(p => p.id === d.id), false),
